@@ -1,0 +1,31 @@
+# 🏗️ Dependencias de Node.js
+node_modules/
+npm-debug.log*
+
+# 🚀 Archivos de entorno y configuración sensible
+.env
+
+# 📂 Archivos de logs
+logs
+*.log
+logs/
+npm-debug.log*
+
+# 🔍 Caché y archivos temporales
+.cache/
+dist/
+build/
+tmp/
+out/
+
+# ⚙️ Configuración del editor y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 🔗 Archivos de lock de dependencias (según el gestor de paquetes que uses)
+package-lock.json
+
+# 🚀 Directorios generados por herramientas de compilación
+coverage/
