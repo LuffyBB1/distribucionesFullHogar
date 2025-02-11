@@ -1,8 +1,7 @@
 const { prisma } = require("../../prisma/database.client.prisma");
-const { Prisma } = require("@prisma/client")
 
-const {validateModel, validateObjectContainsField} = require("../../utils/validatemodels");
-const dtos = require("../../prisma/schema/dto/models.dto")
+const dtos = require("../../prisma/schema/dto/models.dto");
+const {validateModel, validateObjectContainsField, validateNotFoundInPrisma} = require("../../utils/validatemodels");
 
 const crearCliente = async (req, res) => {
   try {
@@ -119,6 +118,9 @@ const obtenerClientePorId = async (req, res) =>{
       res.status(503).json({ error: "No se pudo encontrar el cliente" });
     }
 }
+
+
+
   
 const obtenerClientes = async (req, res) => {
     try {
@@ -151,14 +153,6 @@ const obtenerTelefonosRegistrados = async (req, res) => {
 }
 
 
-const validateNotFoundInPrisma = (error) => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError 
-    && error.code === 'P2025') {
-      return true;
-  }else {
-    return false;
-  }
-}
 
 module.exports = { 
     crearCliente,

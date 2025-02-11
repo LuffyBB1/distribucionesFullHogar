@@ -1,3 +1,4 @@
+const { Prisma } = require("@prisma/client");
 
 const validateModel = (modelObject, modelKeys) => {
     try {
@@ -26,7 +27,26 @@ const validateObjectContainsField = (modelObject, modelKeys) => {
     }
 }
 
+const validateNotFoundInPrisma = (error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError 
+      && error.code === 'P2025') {
+        return true;
+    }else {
+      return false;
+    }
+}
+
+const extraerDtoDeRequest = (body, modelDto) => {
+    const data = Object();
+    modelDto.forEach((field)=>{
+        data[field] = body[field];
+    })    ;
+    return data;
+}
+
 module.exports = {
     validateModel,
-    validateObjectContainsField
+    validateObjectContainsField,
+    validateNotFoundInPrisma,
+    extraerDtoDeRequest
 };
