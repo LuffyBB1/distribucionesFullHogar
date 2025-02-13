@@ -7,11 +7,16 @@ const dtos = require("../../prisma/schema/dto/models.dto");
 
 const estadoFinancieroClientes = async(req, res)=> {
     try {
-        const reporte = await prisma.$queryRawTyped(getAllCreditsReport());
+        let { page, limit } = req.query;
+        if (limit === undefined) {
+            limit = 50;
+        }            
+        const offset = page === undefined ? 0 : (parseInt(page) - 1) * parseInt(limit);
+
+        const reporte = await prisma.$queryRawTyped(getAllCreditsReport(parseInt(limit), parseInt(offset)));        
         if (reporte == null){
             return res.status(500).json();  
         }
-        console.log(reporte);
         reporte.forEach(cliente => {
             cliente.saldo_total = parseInt(cliente.saldo_total);
         });        
@@ -21,6 +26,47 @@ const estadoFinancieroClientes = async(req, res)=> {
         console.error(error);
         return res.status(503).json({ error: "No se pudo crear el reporte" });
     }
+}
+
+const historialCliente = async (req, res) => {
+    try {
+        const { id } = req.params;
+        let { page, limit } = req.query;
+        if (limit === undefined) {
+            limit = 50;
+        }          
+        const offset = page === undefined ? 0 : (parseInt(page) - 1) * parseInt(limit);  
+        console.log(offset, limit);
+        const cliente = await prisma.cliente.findFirstOrThrow({
+            where: {id_cliente: parseInt(id)},
+            select: {
+                id_cliente: true,
+                nombre: true,
+                creditos: {
+                    skip: offset,
+                    take: parseInt(limit),
+                    include: {
+                        pagos: {                        
+                        orderBy: {
+                            fecha_pago: "desc"
+                        }}
+                    },                    
+                }
+            }
+        });
+        if (cliente == null) {
+            return res.status(500).json();    
+        }
+        return res.status(200).json(cliente);
+
+    } 
+    catch (error) {
+        console.error(error);
+        if (validateNotFoundInPrisma(error)) {
+            return res.status(404).json("El cliente no existe");
+        }         
+        return res.status(503).json({ error: "No se pudo crear el reporte" });
+    }   
 }
 
 const resumenCliente = async(req, res) => {
@@ -89,4 +135,5 @@ module.exports = {
     estadoFinancieroClientes,
     resumenCliente,
     resumenFinancieroPeriodico,
+    historialCliente
 }

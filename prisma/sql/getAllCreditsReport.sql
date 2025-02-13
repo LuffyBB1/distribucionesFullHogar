@@ -8,4 +8,5 @@ SELECT
      WHERE c.id_cliente = client.id_cliente),0) AS "saldo_total"
 FROM "Cliente" AS "client"
          INNER JOIN "Credito" AS "c" ON client.id_cliente = c.id_cliente
-group by client.id_cliente;
+GROUP BY client.id_cliente
+LIMIT $1 OFFSET $2;
