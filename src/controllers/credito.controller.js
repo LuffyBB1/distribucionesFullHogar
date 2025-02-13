@@ -111,7 +111,6 @@ const crearCredito = async (req, res) => {
     }
 }
 
-
 const eliminarCredito = async (req, res) => {
     try {
         const { id } = req.params;
@@ -185,6 +184,8 @@ const verificarClienteExiste = async (cliente_id) => {
         return null;
     }
 }
+
+
 
 module.exports = {
     actualizarInformacionCredito,

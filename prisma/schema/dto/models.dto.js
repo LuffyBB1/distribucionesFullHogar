@@ -34,10 +34,17 @@ const pagoDto = [
 
 const frecuenciaPago = ["QUINCENAL", "MENSUAL"];
 
+
+const reportesDto = [
+    "fechaInicial", "fechaFinal"
+];
+
+
 module.exports = {
     actualizarCreditoDto,
     clienteDto,
     clienteCompleto,
     creditoDto,
-    pagoDto
+    pagoDto,
+    reportesDto
 };
