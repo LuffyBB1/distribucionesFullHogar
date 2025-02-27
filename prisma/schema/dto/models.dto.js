@@ -2,15 +2,15 @@ const clienteDto  = [
     "documentoIdentidad", 
     "nombre", 
     "telefono",
-    "direccion"
+    "direccion",
+    "email"
 ];
 
 const clienteCompleto  = [
     "documentoIdentidad", 
     "nombre", 
     "telefono",
-    "direccion",
-    "email",    
+    "direccion", 
 ];
 
 
@@ -40,11 +40,17 @@ const reportesDto = [
 ];
 
 
+const usuarioDto = ["email", "password", "roles", "documentoIdentidad"];
+const editarUsuarioDto = ["email", "password"];
+
+
 module.exports = {
     actualizarCreditoDto,
     clienteDto,
     clienteCompleto,
     creditoDto,
     pagoDto,
-    reportesDto
+    reportesDto,
+    usuarioDto,
+    editarUsuarioDto
 };

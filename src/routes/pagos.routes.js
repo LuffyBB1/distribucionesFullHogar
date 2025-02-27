@@ -1,5 +1,8 @@
 const express = require("express");
 const { registrarPago, obtenerPagosCliente, modificarPago } = require("../controllers/pagos.controller");
+const {JwtSchemeAuthorization} = require("../middleware/authentication.scheme");
+const {policyMiddlewareFactory} = require("../middleware/auth.claim.policy");
+
 
 const router = express.Router();
 

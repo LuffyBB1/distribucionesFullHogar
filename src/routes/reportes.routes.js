@@ -1,6 +1,9 @@
 const express = require("express");
 const Reportes = require("../controllers/reportes.controller");
 const {obtenerClientePorId }= require("../controllers/clientes.controller");
+const {JwtSchemeAuthorization} = require("../middleware/authentication.scheme");
+const {policyMiddlewareFactory} = require("../middleware/auth.claim.policy");
+
 
 const router = express.Router();
 

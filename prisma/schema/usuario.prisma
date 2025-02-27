@@ -1,0 +1,9 @@
+model Usuario {
+    id_user String @id @db.Uuid @default(uuid())
+    email String @unique
+    password String
+    emailConfirmed Boolean @default(false)
+    roles String[] 
+    signup_date DateTime @default(now())
+    client Cliente?
+}

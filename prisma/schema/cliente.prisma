@@ -4,8 +4,9 @@ model Cliente {
   telefono           String  @unique
   direccion          String
   documentoIdentidad String  @unique
-  email              String? @unique
   estado_credito     Boolean @default(true)
   fecha_registro     DateTime @default(now())
   creditos           Credito[]
+  id_usuario         String  @db.Uuid @unique
+  usuario            Usuario @relation(fields: [id_usuario], references: [id_user], onDelete: Cascade)
 }

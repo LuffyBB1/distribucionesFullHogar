@@ -15,10 +15,14 @@ const clientesRoutes = require("./src/routes/clientes.routes");
 const pagosRoutes = require("./src/routes/pagos.routes");
 const creditosRoutes = require("./src/routes/creditos.routes");
 const reportesRoutes = require("./src/routes/reportes.routes");
+const usuariosRoutes = require("./src/routes/usuarios.routes");
+const authRoutes = require("./src/routes/autenticacion.routes");
 
 app.use("/api/pagos", pagosRoutes);
 app.use("/api/clientes", clientesRoutes);
 app.use("/api/creditos", creditosRoutes);
+app.use("/api/usuarios", usuariosRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api", reportesRoutes);
 
 app.get("/", (req, res) => {
