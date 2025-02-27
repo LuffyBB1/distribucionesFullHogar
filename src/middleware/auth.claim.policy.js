@@ -69,11 +69,23 @@ const rolePolicyMiddlewareFactory = (roleValue) => {
                     roles: true
                 }
             });
+
+            const roles = await prisma.role.findMany();
             
             user['isAuthenticated'] = req.isAuthenticated;
             const validation = await validateRoleRequirements(user, roleValue);
             if (validation == null || validation === false){
                 return res.status(403).json();
+            }
+            user.roles = user.roles.map(urole => 
+                roles.find(role => role.id === urole)
+            );
+            req['claims'] = user;
+            const adminRole = user.roles.find(role => role.Name === "Admin");
+            if (adminRole != null) {
+                req.isAdmin = true;
+            } else{
+                req.isAdmin = false;
             }
             next();
         } catch(error){

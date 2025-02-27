@@ -36,9 +36,19 @@ const historialCliente = async (req, res) => {
             limit = 50;
         }          
         const offset = page === undefined ? 0 : (parseInt(page) - 1) * parseInt(limit);  
-        console.log(offset, limit);
+        let filter;
+        if (req.isAdmin) {
+            filter = {
+                id_cliente: id
+            };
+        } else {
+            filter = {
+                id_cliente: id,
+                id_usuario: req.userId
+            };
+        }
         const cliente = await prisma.cliente.findFirstOrThrow({
-            where: {id_cliente: parseInt(id)},
+            where: filter,
             select: {
                 id_cliente: true,
                 nombre: true,
@@ -55,7 +65,7 @@ const historialCliente = async (req, res) => {
             }
         });
         if (cliente == null) {
-            return res.status(500).json();    
+            return res.status(403).json();    
         }
         return res.status(200).json(cliente);
 
@@ -72,8 +82,19 @@ const historialCliente = async (req, res) => {
 const resumenCliente = async(req, res) => {
     try {
         const { id } = req.params;
+        let filter;
+        if (req.isAdmin) {
+            filter = {
+                id_cliente: parseInt(id)
+            };
+        } else {
+            filter = {
+                id_cliente: parseInt(id),
+                id_usuario: req.userId
+            };
+        }        
         const cliente = await prisma.cliente.findFirstOrThrow({
-            where: {id_cliente: parseInt(id)},
+            where: filter,
             select: {
                 id_cliente: true,
                 documentoIdentidad: true

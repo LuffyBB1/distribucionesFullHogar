@@ -1,5 +1,0 @@
-model RoleUser {
-    id Int @id @default(autoincrement())
-    user_id String @db.Uuid 
-    role_id String @db.Uuid
-}

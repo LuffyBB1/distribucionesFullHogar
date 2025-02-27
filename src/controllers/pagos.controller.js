@@ -52,11 +52,11 @@ const registrarPago = async (req, res) => {
  * Obtener pagos de un cliente
  */
 const obtenerPagosCliente = async (req, res) => {
-  const { id_cliente } = req.params;
+
 
   try {
     const cliente = await prisma.cliente.findUnique({
-      where: { id_cliente: parseInt(id_cliente) },
+      where: { id_cliente: parseInt(req.params.id) },
       include: { creditos: { include: { pagos: true } } },
     });
 
@@ -74,12 +74,12 @@ const obtenerPagosCliente = async (req, res) => {
  * Modificar un pago existente
  */
 const modificarPago = async (req, res) => {
-  const { id_pago } = req.params;
+  const { id } = req.params;
   const { monto_pago } = req.body;
 
   try {
     const pagoExistente = await prisma.pago.findUnique({
-      where: { id_pago: parseInt(id_pago) },
+      where: { id_pago: parseInt(id) },
     });
 
     if (!pagoExistente) {
@@ -87,7 +87,7 @@ const modificarPago = async (req, res) => {
     }
 
     const pagoActualizado = await prisma.pago.update({
-      where: { id_pago: parseInt(id_pago) },
+      where: { id_pago: parseInt(id) },
       data: { monto_pago },
     });
 
@@ -97,4 +97,25 @@ const modificarPago = async (req, res) => {
   }
 };
 
-module.exports = { registrarPago, obtenerPagosCliente, modificarPago };
+const eliminarPago = async (req, res)=> {
+  try{
+    const milisegundosAHoras = 1000 * 60 * 60;
+    const tiempoParaAjuste = 7 * 24;
+    const pago = await prisma.pago.findUnique({
+      where: {id_pago: parseInt(req.params.id)}
+    });
+    if (pago == null) { return res.status(404).json("Pago no encontrado"); }
+    const horasDesdePago = (new Date() - pago.fecha_pago)/milisegundosAHoras;
+    if (horasDesdePago > tiempoParaAjuste) { return res.status(409).json("No se puede eliminar un pago realizado hace más de 7 días")}
+    const pagoEliminado = await prisma.pago.delete({
+      where: {id_pago: parseInt(req.params.id)}
+    });
+    if (pagoEliminado == null) { return res.status(503).json();}
+    return res.status(200).json(`El pago con id ${pagoEliminado.id_pago} ha sido eliminado satisfactoriamente`);
+  }catch(err){
+    console.error(err);
+    return res.status(503).json();
+  }
+}
+
+module.exports = { registrarPago, obtenerPagosCliente, modificarPago, eliminarPago };

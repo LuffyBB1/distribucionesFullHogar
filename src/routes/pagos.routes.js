@@ -1,13 +1,16 @@
 const express = require("express");
-const { registrarPago, obtenerPagosCliente, modificarPago } = require("../controllers/pagos.controller");
+const Pago = require("../controllers/pagos.controller");
 const {JwtSchemeAuthorization} = require("../middleware/authentication.scheme");
 const {policyMiddlewareFactory} = require("../middleware/auth.claim.policy");
 
-
 const router = express.Router();
 
-router.post("/", registrarPago);
-router.get("/:id_cliente", obtenerPagosCliente);
-router.put("/:id_pago", modificarPago);
+router.use(JwtSchemeAuthorization);
+router.use(policyMiddlewareFactory("Admin"));
+
+router.post("/", Pago.registrarPago);
+router.get("/clientes/:id", Pago.obtenerPagosCliente);
+router.put("/:id", Pago.modificarPago);
+router.delete("/:id", Pago.eliminarPago);
 
 module.exports = router;

@@ -34,16 +34,7 @@ const crearUsuario = async (req, res)=> {
                 const usuarioCreado = await prisma.$transaction(async (tx) =>{
                     const usuarioCreado = await tx.usuario.create({
                         data: data
-                    });
-                    for (const role of assignedRoles) {
-
-                        await tx.roleUser.create({
-                            data: {
-                                user_id: usuarioCreado.id_user,
-                                role_id: role
-                            }
-                        })
-                    }                    
+                    });                
                     return usuarioCreado;
                 });
                 return res.status(201).json({
@@ -67,7 +58,8 @@ const crearUsuario = async (req, res)=> {
 
 const actualizarUsuario = async (req, res)=>{
     try{
-        const idUsuario = req.params.id;    
+        
+        if (req.userId !== req.params.id && !isAdmin) { return res.status(403).json(); }
         const camposActualizados  = validateObjectContainsField(req.body, dtos.editarUsuarioDto);
         let usuarioActualizado;
         let clienteActualizado;
@@ -109,6 +101,7 @@ const actualizarUsuario = async (req, res)=>{
 }
 const obtenerUsuarioPorId = async (req, res)=>{
     try{
+        if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         const usuario = await prisma.usuario.findFirstOrThrow({
             where:  {id_user: req.params.id},
             omit: {

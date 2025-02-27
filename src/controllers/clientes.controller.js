@@ -28,7 +28,7 @@ const crearCliente = async (req, res) => {
         }
       }
 
-      const usuario = await prisma.usuario.findFirst({
+      let usuario = await prisma.usuario.findFirst({
         where: {email: req.body.email.toLowerCase()}
       });
 
@@ -42,7 +42,7 @@ const crearCliente = async (req, res) => {
       console.log(hash);   
       const clienteCreado = await prisma.$transaction(async (tx)=>{   
         if (usuario == null) {
-          const usuario = await prisma.usuario.create({
+          usuario = await tx.usuario.create({
             data: {
               email : req.body.email.toLowerCase(),
               password: hash,
@@ -50,19 +50,13 @@ const crearCliente = async (req, res) => {
             }
           })        
         }
-        const clienteCreado= await prisma.cliente.create({data:{
+        const clienteCreado= await tx.cliente.create({data:{
           nombre : req.body.nombre,
           telefono: req.body.telefono,
           documentoIdentidad: req.body.documentoIdentidad,
           direccion: req.body.direccion,
           id_usuario: usuario.id_user
         }});
-        await prisma.roleUser.create({
-          data :{
-            user_id: usuario.id_user,
-            role_id: userRole.id
-          }
-        })
         return clienteCreado;
       });
       if (clienteCreado) {
