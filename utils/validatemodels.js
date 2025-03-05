@@ -49,8 +49,10 @@ const validateUniqueFieldViolation = (error) => {
 const extraerDtoDeRequest = (body, modelDto) => {
     const data = Object();
     modelDto.forEach((field)=>{
-        data[field] = body[field];
-    })    ;
+        if (body[field] != null) {
+            data[field] = body[field];
+        }
+    });
     return data;
 }
 

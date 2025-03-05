@@ -11,8 +11,7 @@ const JwtSchemeAuthorization  = async(req, res, next) => {
         const foundBannedToken = await prisma.token.findFirst({
             where: {jti : payload.jti}
         });
-        console.log(foundBannedToken, payload.jti);
-        tokenClaims = Object.keys(payload);
+        var tokenClaims = Object.keys(payload);
         const hasRequiredTokens = (requiredTokenPayloadClaims.map(claim => tokenClaims.includes(claim))).every(Boolean);
         if (foundBannedToken || !hasRequiredTokens) { return res.status(401).json("Unauthorized"); }
         req.userId = payload.sub;

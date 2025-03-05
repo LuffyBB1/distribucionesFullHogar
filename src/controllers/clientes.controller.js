@@ -1,71 +1,71 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const bcrypt = require('bcrypt');
-const dtos = require("../../prisma/schema/dto/models.dto");
-const {validateModel, validateObjectContainsField, validateNotFoundInPrisma, validateUniqueFieldViolation} = require("../../utils/validatemodels");
+const { validationResult } = require("express-validator");
+const {  validateNotFoundInPrisma, validateUniqueFieldViolation} = require("../../utils/validatemodels");
 
 const crearCliente = async (req, res) => {
   try {
     const saltRounds = 12;
-    if (validateModel(req.body, dtos.clienteDto)) {
-      // const {nombre, telefono, direccion, documentoIdentidad} = req.body; 
-      const cliente = await prisma.cliente.findFirst({
-        where: {telefono : req.body.telefono},
-        select:{
-          telefono: true,
-          usuario:{
-            select: {
-              email: true
-            }
+    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(validationResult(req)); } 
+    // const {nombre, telefono, direccion, documentoIdentidad} = req.body; 
+    const cliente = await prisma.cliente.findFirst({
+      where: {telefono : req.body.telefono},
+      select:{
+        telefono: true,
+        usuario:{
+          select: {
+            email: true
           }
         }
-      });
-      if (cliente != null) {
-        if (cliente.telefono != null) {    
-          return res.status(400).json({message: "El número de teléfono ya está registrado"});
-        }
-        if (cliente.email != null) {
-          return res.status(400).json({message: "El email ya está registrado"});
-        }
       }
-
-      let usuario = await prisma.usuario.findFirst({
-        where: {email: req.body.email.toLowerCase()}
-      });
-
-      const userRole = await prisma.role.findFirst({
-        where: {Name: "User"},
-        select:{
-          id: true
-        }
-      });
-      const hash = await bcrypt.hash(`${req.body.documentoIdentidad}-${req.body.nombre.toLowerCase().split(" ")[0]}`, saltRounds);   
-      console.log(hash);   
-      const clienteCreado = await prisma.$transaction(async (tx)=>{   
-        if (usuario == null) {
-          usuario = await tx.usuario.create({
-            data: {
-              email : req.body.email.toLowerCase(),
-              password: hash,
-              roles: [userRole.id]
-            }
-          })        
-        }
-        const clienteCreado= await tx.cliente.create({data:{
-          nombre : req.body.nombre,
-          telefono: req.body.telefono,
-          documentoIdentidad: req.body.documentoIdentidad,
-          direccion: req.body.direccion,
-          id_usuario: usuario.id_user
-        }});
-        return clienteCreado;
-      });
-      if (clienteCreado) {
-        return res.status(201).json({"message": "Usuario creado correctamente",
-          cliente_id : `${process.env.HOST}/api/clientes/${clienteCreado.documentoIdentidad}`});
+    });
+    if (cliente != null) {
+      if (cliente.telefono != null) {    
+        return res.status(400).json({message: "El número de teléfono ya está registrado"});
       }
-    } else {
-      return res.status(400).json();
+      if (cliente.email != null) {
+        return res.status(400).json({message: "El email ya está registrado"});
+      }
     }
+
+    let usuario = await prisma.usuario.findFirst({
+      where: {email: req.body.email.toLowerCase()}
+    });
+
+    const userRole = await prisma.role.findFirst({
+      where: {Name: "User"},
+      select:{
+        id: true
+      }
+    });
+    const hash = await bcrypt.hash(`${req.body.documentoIdentidad}-${req.body.nombre.toLowerCase().split(" ")[0]}`, saltRounds);      
+    const clienteCreado = await prisma.$transaction(async (tx)=>{   
+      if (usuario == null) {
+        usuario = await tx.usuario.create({
+          data: {
+            email : req.body.email.toLowerCase(),
+            password: hash,
+            roles: [userRole.id]
+          }
+        })        
+      }
+      const clienteCreado= await tx.cliente.create({data:{
+        nombre : req.body.nombre,
+        telefono: req.body.telefono,
+        documentoIdentidad: req.body.documentoIdentidad,
+        direccion: req.body.direccion,
+        id_usuario: usuario.id_user
+      }});
+      return clienteCreado;
+    });
+    if (clienteCreado) {
+      return res.status(201).json({"message": "Usuario creado correctamente",
+        cliente_id : `${process.env.HOST}/api/clientes/${clienteCreado.documentoIdentidad}`});
+    }
+    else {
+      return res.status(503).json({ error: "No se pudo registrar el cliente" });
+    }
+    
   } catch (error) {
     console.error(error);
     if (validateUniqueFieldViolation(error)){
@@ -77,15 +77,17 @@ const crearCliente = async (req, res) => {
 
 const editarCliente = async(req, res) => {
   try {
+    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(); } 
     const { id } = req.params;
-    camposAtualizados = validateObjectContainsField(req.body, dtos.clienteCompleto);
-    if (camposAtualizados.length > 0) {
+    console.log(req.params.id, Object.keys(req.body).length);
+    if (Object.keys(req.body).length > 0) {
       const telefonosRegistrados = await obtenerTelefonosRegistrados();
-      if (camposAtualizados.telefono != null && telefonosRegistrados.includes(req.body.telefono)) {
+      if (req.body.telefono != null && telefonosRegistrados.includes(req.body.telefono)) {
         return res(400).json({message: "El número de teléfono ya está registrado"});
       }      
+      const camposActualizados = ["nombre", "telefono", "direccion"];
       const data = Object();
-      camposAtualizados.forEach(field => {
+      camposActualizados.forEach(field => {
           data[field] = req.body[field];
       });
 
@@ -114,6 +116,7 @@ const editarCliente = async(req, res) => {
 
 const eliminarCliente = async(req, res) => {
   try{
+    if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
     const { id } = req.params;
     const cliente = await prisma.cliente.findFirst({
       where: {documentoIdentidad : id}})
@@ -135,10 +138,8 @@ const eliminarCliente = async(req, res) => {
 
 const obtenerClientePorId = async (req, res) =>{
   try{
+    if (!validationResult(req).isEmpty()) { return res.status(400).json(); }    
     const { id } = req.params;
-    if (id == null) {
-      return res.status(400).json();
-    }
 
     cliente = await prisma.cliente.findFirst({
       where: {documentoIdentidad: id},

@@ -1,13 +1,13 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const bcrypt = require('bcrypt');
-const {validateModel, validateObjectContainsField, validateNotFoundInPrisma, validateUniqueFieldViolation} = require("../../utils/validatemodels");
-const {eliminarCliente, editarCliente} = require("./clientes.controller");
-const dtos = require("../../prisma/schema/dto/models.dto");
+const {validateNotFoundInPrisma, validateUniqueFieldViolation, extraerDtoDeRequest} = require("../../utils/validatemodels");
+const {eliminarCliente} = require("./clientes.controller");
+const { validationResult } = require("express-validator");
 
 const crearUsuario = async (req, res)=> {
     const saltRounds = 12;
     try{
-        if (!validateModel(req.body, dtos.usuarioDto)) { return res.status(400).json("Bad request"); }
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
         const cliente =  await prisma.cliente.findFirst({
             where: {documentoIdentidad: req.body.documentoIdentidad}
         });
@@ -47,7 +47,6 @@ const crearUsuario = async (req, res)=> {
                 }
                 return res.status(503).json(); 
             }
-
         });
     }catch(err){
         console.error(err);
@@ -57,17 +56,13 @@ const crearUsuario = async (req, res)=> {
 
 
 const actualizarUsuario = async (req, res)=>{
-    try{
-        
-        if (req.userId !== req.params.id && !isAdmin) { return res.status(403).json(); }
-        const camposActualizados  = validateObjectContainsField(req.body, dtos.editarUsuarioDto);
+    try {        
+        if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(); } 
+        if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         let usuarioActualizado;
         let clienteActualizado;
-        if (Object.keys(camposActualizados).length > 0){
-            const data = Object();
-            camposActualizados.forEach(field => {
-                data[field] = req.body[field];
-            });    
+        if (Object.keys(req.body).length > 0){
+            const data = extraerDtoDeRequest(req.body, ["email", "password"]);
             usuarioActualizado = await prisma.usuario.update({
                 where: {id_user : req.params.id},
                 data: data
@@ -101,6 +96,7 @@ const actualizarUsuario = async (req, res)=>{
 }
 const obtenerUsuarioPorId = async (req, res)=>{
     try{
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         const usuario = await prisma.usuario.findFirstOrThrow({
             where:  {id_user: req.params.id},
@@ -149,6 +145,7 @@ const obtenerUsuarios = async (req, res) =>{
 const eliminarUsuario = async (req, res) =>{
     try
     {
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
         const { id } = req.params;
         const usuario = await prisma.usuario.findFirstOrThrow({
             where: {id_user: id},
@@ -164,7 +161,7 @@ const eliminarUsuario = async (req, res) =>{
         const usuarioEliminado = await prisma.usuario.delete({
             where: { id_user: usuario.id_user }        
         });    
-        return res.status(200).json({message: `Usuario con id: ${usuarioEliminado.id_user} eliminado con éxito.`});
+        return res.status(200).json({message: `Usuario con id: ${usuarioEliminado.id_user} fue eliminado con éxito.`});
 
     }catch (error) {
         console.log(error);

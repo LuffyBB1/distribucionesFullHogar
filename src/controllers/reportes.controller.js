@@ -1,12 +1,13 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const { getAllCreditsReport, getReport, getUserCreditReport } = require('@prisma/client/sql');
-const {validateModel, validateNotFoundInPrisma} = require("../../utils/validatemodels");
-const dtos = require("../../prisma/schema/dto/models.dto");
+const {validateNotFoundInPrisma} = require("../../utils/validatemodels");
+const { validationResult } = require("express-validator");
 
 
 
 const estadoFinancieroClientes = async(req, res)=> {
     try {
+        
         let { page, limit } = req.query;
         if (limit === undefined) {
             limit = 50;
@@ -30,6 +31,7 @@ const estadoFinancieroClientes = async(req, res)=> {
 
 const historialCliente = async (req, res) => {
     try {
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
         const { id } = req.params;
         let { page, limit } = req.query;
         if (limit === undefined) {
@@ -81,6 +83,8 @@ const historialCliente = async (req, res) => {
 
 const resumenCliente = async(req, res) => {
     try {
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+        if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         const { id } = req.params;
         let filter;
         if (req.isAdmin) {
@@ -126,13 +130,9 @@ const resumenCliente = async(req, res) => {
 
 const resumenFinancieroPeriodico = async(req, res)=> {
     try {
-
-        if (!validateModel(req.query, dtos.reportesDto)){
-            return res.status(400).json();
-        }
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
         const { fechaInicial, fechaFinal } = req.query;        
-        const reporte = await prisma.$queryRawTyped(
-            getReport(
+        const reporte = await prisma.$queryRawTyped(getReport(
                 new Date(fechaInicial), new Date(fechaFinal)));
         
         if (reporte == null) {

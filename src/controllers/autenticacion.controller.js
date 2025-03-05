@@ -1,22 +1,23 @@
 const { prisma } = require("../../prisma/database.client.prisma");
-const bcrypt = require('bcrypt');
+const bcrypt = require("bcrypt");
+const { validationResult } = require("express-validator");
 const { validateNotFoundInPrisma } = require("../../utils/validatemodels");
 const {
     generatePayload,
     signToken,
     validateToken
 } = require("../middleware/auth.jwt.handler");
+const { empty } = require("@prisma/client/runtime/library");
 
 
 
 const login = async (req, res)=> {
-    try {
-        const {email, password} = req.body;
-        if (!(email && password)) { return res.status(400).json(); }
+    try {        
+        if (!validationResult(req).isEmpty()) { return res.status(400).json(); }
         const usuario = await prisma.usuario.findFirstOrThrow({
-            where: {email: email}
+            where: {email: req.body.email}
         });
-        bcrypt.compare(password, usuario.password, function(err, result) {
+        bcrypt.compare(req.body.password, usuario.password, function(err, result) {
             try {
                 if (result === true){
                     const payload = generatePayload(usuario.id_user);
