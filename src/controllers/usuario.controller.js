@@ -1,14 +1,18 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const bcrypt = require('bcrypt');
 const {validateNotFoundInPrisma, validateUniqueFieldViolation, extraerDtoDeRequest} = require("../../utils/validatemodels");
+const { loggerMiddleware } = require("../logging/logger");
 const {eliminarCliente} = require("./clientes.controller");
 const { validationResult } = require("express-validator");
 
 const crearUsuario = async (req, res)=> {
     const saltRounds = 12;
     try{
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
-        const cliente =  await prisma.cliente.findFirst({
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);            
+            return res.status(400).json();; 
+        } 
+        const cliente =  await prisma.cliente.findUnique({
             where: {documentoIdentidad: req.body.documentoIdentidad}
         });
         const roles = await prisma.role.findMany();
@@ -45,19 +49,23 @@ const crearUsuario = async (req, res)=> {
                 if (validateUniqueFieldViolation(err)) {
                     return res.status(409).json("El correo electrónico ya se encuentra registrado");
                 }
-                return res.status(503).json(); 
+                loggerMiddleware.error(error.message);
+                return res.status(503).json("No se pudo contactar con el servicio");  
             }
         });
     }catch(err){
-        console.error(err);
-        return res.status(503).json();
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }    
 }
 
 
 const actualizarUsuario = async (req, res)=>{
     try {        
-        if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(); } 
+        if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
+            loggerMiddleware.error('Validation errors:', JSON.stringify(validationResult(req).array()));
+            return res.status(400).json(); 
+        } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         let usuarioActualizado;
         let clienteActualizado;
@@ -68,11 +76,11 @@ const actualizarUsuario = async (req, res)=>{
                 data: data
             });        
         }
-        const cliente = (await prisma.cliente.findFirst({
+        const cliente = (await prisma.cliente.findUnique({
             where: {id_usuario : usuarioActualizado.id_user},
         }));
         
-        if (req.body.nombre && cliente == null) { return res.status(404).json("El usuario no tiene un cliente asociado") }            
+        if (req.body.nombre && cliente == null) { return res.status(409).json("El usuario no tiene un cliente asociado") }            
         if (req.body.nombre && cliente != null){
             clienteActualizado = await prisma.cliente.update({
                     where: {id_cliente: cliente.id_cliente},
@@ -80,10 +88,10 @@ const actualizarUsuario = async (req, res)=>{
             });
         }
         
-        if (usuarioActualizado || clienteActualizado) { 
+        if (usuarioActualizado == null || clienteActualizado == null) { 
             return res.status(200).json("Usuario actualizado");
         } else {
-            return res.status(400).json();
+            return res.status(404).json();
         }
     }
     catch (error) {
@@ -91,14 +99,18 @@ const actualizarUsuario = async (req, res)=>{
         if (validateNotFoundInPrisma(error)) {
             return res.status(404).json("El usuario no existe");
         }    
-        return res.status(503).json({ error: "No se pudo editar el cliente" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
       }  
 }
 const obtenerUsuarioPorId = async (req, res)=>{
     try{
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json();; 
+        } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
-        const usuario = await prisma.usuario.findFirstOrThrow({
+        const usuario = await prisma.usuario.findUniqueOrThrow({
             where:  {id_user: req.params.id},
             omit: {
                 password: true
@@ -115,11 +127,12 @@ const obtenerUsuarioPorId = async (req, res)=>{
         if (validateNotFoundInPrisma(error)) {
             return res.status(404).json("El usuario no existe");
         }    
-        return res.status(503).json({ error: "No se pudo encontrar el cliente" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
       }  
 
 }
-const obtenerUsuarios = async (req, res) =>{
+const obtenerUsuarios = async (res) =>{
     try {
         const usuarios = await prisma.usuario.findMany({
             select: {
@@ -138,14 +151,18 @@ const obtenerUsuarios = async (req, res) =>{
           }
           res.status(200).json(usuarios);        
     }catch (error) {
-      res.status(503).json({ error: "Error al obtener clientes" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }
 }
 
 const eliminarUsuario = async (req, res) =>{
     try
     {
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json(); 
+        } 
         const { id } = req.params;
         const usuario = await prisma.usuario.findFirstOrThrow({
             where: {id_user: id},
@@ -164,11 +181,11 @@ const eliminarUsuario = async (req, res) =>{
         return res.status(200).json({message: `Usuario con id: ${usuarioEliminado.id_user} fue eliminado con éxito.`});
 
     }catch (error) {
-        console.log(error);
         if (validateNotFoundInPrisma(error)) {
-            return res.status(404).json("El usuario no existe");
+            return res.status(404).json();
         }    
-        return res.status(503).json({ error: "No se pudo encontrar el cliente" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
       }  
 }
 

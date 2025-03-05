@@ -22,6 +22,17 @@ const validarQueryIntId  = checkSchema({
     }
 });
 
+const validarParamsIdDI  = checkSchema({
+  id: {
+    exists: true,
+    notEmpty: true,
+    isString: true,
+    isLength: { options: { min: 8 } },
+    escape: true,
+    trim: true,
+  }
+});
+
 const validarParamsUuidId  = checkSchema({
     id: {
       exists: true,
@@ -56,5 +67,6 @@ module.exports = {
     validarParamsIntId,
     validarParamsUuidId,
     validarPaginacion,
-    validarQueryIntId
+    validarQueryIntId,
+    validarParamsIdDI
 }

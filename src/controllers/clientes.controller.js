@@ -2,11 +2,16 @@ const { prisma } = require("../../prisma/database.client.prisma");
 const bcrypt = require('bcrypt');
 const { validationResult } = require("express-validator");
 const {  validateNotFoundInPrisma, validateUniqueFieldViolation} = require("../../utils/validatemodels");
+const { loggerMiddleware } = require("../logging/logger");
+const { cli } = require("winston/lib/winston/config");
 
 const crearCliente = async (req, res) => {
   try {
     const saltRounds = 12;
-    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(validationResult(req)); } 
+    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json();
+    } 
     // const {nombre, telefono, direccion, documentoIdentidad} = req.body; 
     const cliente = await prisma.cliente.findFirst({
       where: {telefono : req.body.telefono},
@@ -40,7 +45,7 @@ const crearCliente = async (req, res) => {
     });
     const hash = await bcrypt.hash(`${req.body.documentoIdentidad}-${req.body.nombre.toLowerCase().split(" ")[0]}`, saltRounds);      
     const clienteCreado = await prisma.$transaction(async (tx)=>{   
-      if (usuario == null) {
+    if (usuario == null) {
         usuario = await tx.usuario.create({
           data: {
             email : req.body.email.toLowerCase(),
@@ -62,63 +67,67 @@ const crearCliente = async (req, res) => {
       return res.status(201).json({"message": "Usuario creado correctamente",
         cliente_id : `${process.env.HOST}/api/clientes/${clienteCreado.documentoIdentidad}`});
     }
-    else {
-      return res.status(503).json({ error: "No se pudo registrar el cliente" });
+    else {      
+      return res.status(409).json({ error: "Ya se encuentra registrado un usuario con la información enviada" });
     }
     
   } catch (error) {
-    console.error(error);
     if (validateUniqueFieldViolation(error)){
-      return  res.status(409).json("Telefono o documento de indentidad se encuentra registrado")
+      return  res.status(409).json("Telefono o documento de indentidad ya se encuentra registrado")
     }
-    return res.status(503).json({ error: "No se pudo registrar el cliente" });
+    loggerMiddleware.error(error.message);
+    return res.status(503).json({ error: "Servicio no disponible" });
   }
 }
 
 const editarCliente = async(req, res) => {
   try {
-    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(); } 
-    const { id } = req.params;
-    console.log(req.params.id, Object.keys(req.body).length);
-    if (Object.keys(req.body).length > 0) {
-      const telefonosRegistrados = await obtenerTelefonosRegistrados();
-      if (req.body.telefono != null && telefonosRegistrados.includes(req.body.telefono)) {
-        return res(400).json({message: "El número de teléfono ya está registrado"});
-      }      
-      const camposActualizados = ["nombre", "telefono", "direccion"];
-      const data = Object();
-      camposActualizados.forEach(field => {
-          data[field] = req.body[field];
-      });
+    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json(); 
+    } 
 
-      
-      clienteActualizado = await prisma.cliente.update({
-        where: {documentoIdentidad : id},
-        data: data
-      });
-      
-      return res.status(201).json({
-        message: "Cliente actualizado correctamente",
-        cliente_id : `${process.env.HOST}/api/clientes/${clienteActualizado.documentoIdentidad}`
-      });
-    } else {
-      return res.status(400).json({ error: "No se pudo editar el cliente" });
+    const telefonosRegistrados = await obtenerTelefonosRegistrados();
+    if (req.body.telefono != null && telefonosRegistrados.includes(req.body.telefono)) {
+      return res(400).json({message: "El número de teléfono ya está registrado"});
+    }      
+    const camposEditables = ["nombre", "telefono", "direccion"];
+    const data = Object();
+    camposEditables.forEach(field => {
+        data[field] = req.body[field];
+    });
+    
+    const clienteActualizado = await prisma.cliente.update({
+      where: {documentoIdentidad : req.params.id},
+      data: data
+    });
+
+    if (clienteActualizado == null) {
+      return res.status(404).json("Cliente no fue encontrado");
     }
-
+    
+    return res.status(201).json({
+      message: "Cliente actualizado correctamente",
+      cliente_id : `${process.env.HOST}/api/clientes/${clienteActualizado.documentoIdentidad}`
+    });
+    
   } catch (error) {
-    console.log(error);
     if (validateNotFoundInPrisma(error)) {
-        return res.status(404).json();
+      return res.status(404).json();
     }    
-    return res.status(503).json({ error: "No se pudo editar el cliente" });
+    loggerMiddleware.error(error.message);
+    return res.status(503).json({ error: "Servicio no disponible" });
   }  
 }
 
 const eliminarCliente = async(req, res) => {
   try{
-    if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+    if (!validationResult(req)) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json(); 
+    } 
     const { id } = req.params;
-    const cliente = await prisma.cliente.findFirst({
+    const cliente = await prisma.cliente.findUniqueOrThrow({
       where: {documentoIdentidad : id}})
     if (cliente.estado_credito) {
       return res.status(400).json({
@@ -132,7 +141,8 @@ const eliminarCliente = async(req, res) => {
     if (validateNotFoundInPrisma(error)) {
       return res.status(404).json();
     }       
-    return res.status(503).json({ error: "No se pudo eliminar el cliente" });
+    loggerMiddleware.error(error.message);
+    return res.status(503).json({ error: "Servicio no disponible" });
   }  
 }
 
@@ -164,7 +174,8 @@ const obtenerClientePorId = async (req, res) =>{
       if (validateNotFoundInPrisma(error)) {
           return res.status(404).json();
       }      
-      res.status(503).json({ error: "No se pudo encontrar el cliente" });
+      loggerMiddleware.error(error.message);
+      return res.status(503).json({ error: "Servicio no disponible" });
     }
 }
 
@@ -185,11 +196,12 @@ const obtenerClientes = async (req, res) => {
       }
       res.status(200).json(clientes);
     } catch (error) {
-      res.status(503).json({ error: "Error al obtener clientes" });
+      loggerMiddleware.error(error.message);
+      return res.status(503).json({ error: "Servicio no disponible" });
     }
   };
 
-const obtenerTelefonosRegistrados = async (req, res) => {
+const obtenerTelefonosRegistrados = async () => {
   return (await prisma.cliente.findMany({
     select: {
           telefono: true
@@ -197,8 +209,6 @@ const obtenerTelefonosRegistrados = async (req, res) => {
     }))
     .map(cliente => cliente.telefono);
 }
-
-
 
 module.exports = { 
     crearCliente,

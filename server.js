@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const logger = require("./src/logging/logger");
 
 dotenv.config();
 
@@ -17,6 +18,9 @@ const creditosRoutes = require("./src/routes/creditos.routes");
 const reportesRoutes = require("./src/routes/reportes.routes");
 const usuariosRoutes = require("./src/routes/usuarios.routes");
 const authRoutes = require("./src/routes/autenticacion.routes");
+const { loggerHttpEvents, loggerHttpErrors, loggerMiddleware } = require("./src/logging/logger");
+
+app.use(loggerHttpEvents);
 
 app.use("/api/pagos", pagosRoutes);
 app.use("/api/clientes", clientesRoutes);
@@ -29,6 +33,13 @@ app.get("/", (req, res) => {
   res.send("API de Cartera de Clientes funcionando 🚀");
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+app.use(loggerHttpErrors);
+
+try {
+  app.listen(PORT, () => {
+    loggerMiddleware.info(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+} catch(err){
+  
+  loggerMiddleware.error($`La aplicación se detuvo debido a: {err.message}`);
+}

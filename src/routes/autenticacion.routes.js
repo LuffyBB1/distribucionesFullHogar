@@ -5,7 +5,7 @@ const {ValidateLoginData} = require("../../utils/validateUserActionAccess");
 
 
 const router = express.Router();
-router.post("/login", ValidateLoginData,Autenticacion.login);
+router.post("/login", ValidateLoginData, Autenticacion.login);
 router.post("/logout",JwtSchemeAuthorization, Autenticacion.logout)
 
 module.exports = router;

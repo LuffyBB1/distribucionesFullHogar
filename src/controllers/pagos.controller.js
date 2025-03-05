@@ -2,10 +2,16 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const { validationResult } = require("express-validator");
 const { validateNotFoundInPrisma } = require("../../utils/validatemodels");
+const { loggerMiddleware } = require("../logging/logger");
+
+
 const registrarPago = async (req, res) => {
   
   try {
-    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(validationResult(req)); }     
+    if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json();; 
+    }     
     const { id_credito, monto_pago } = req.body;
     // Verificar que el crédito existe y está pendiente
     const credito = await prisma.credito.findUniqueOrThrow({
@@ -45,7 +51,8 @@ const registrarPago = async (req, res) => {
     });
     return res.status(201).json(nuevoPago);
   } catch (error) {
-    res.status(500).json({ error: "Error al registrar el pago" });
+    loggerMiddleware.error(error.message);
+    return res.status(503).json("No se pudo contactar con el servicio");   
   }
 };
 
@@ -54,19 +61,22 @@ const registrarPago = async (req, res) => {
  */
 const obtenerPagosCliente = async (req, res) => {
   try {
-    if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
-    const cliente = await prisma.cliente.findUnique({
+    if (!validationResult(req).isEmpty()) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json(); 
+    } 
+    const cliente = await prisma.cliente.findUniqueOrThrow({
       where: { id_cliente: parseInt(req.params.id) },
       include: { creditos: { include: { pagos: true } } },
     });
 
-    if (!cliente) {
-      return res.status(404).json({ error: "Cliente no encontrado" });
-    }
-
-    res.json(cliente.creditos);
+    return res.status(200).json(cliente.creditos);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener pagos del cliente" });
+    if (validateNotFoundInPrisma(error)) {
+      return res.status(404).json();
+    }         
+    loggerMiddleware.error(error.message);
+    return res.status(503).json("No se pudo contactar con el servicio");   
   }
 };
 
@@ -74,17 +84,16 @@ const obtenerPagosCliente = async (req, res) => {
  * Modificar un pago existente
  */
 const modificarPago = async (req, res) => {
-  if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { return res.status(400).json(); } 
+  if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
+    loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+    return res.status(400).json(); 
+  } 
   const { id } = req.params;
   const { id_credito, monto_pago } = req.body;
   try {
     const pagoExistente = await prisma.pago.findUniqueOrThrow({
       where: { id_pago: parseInt(id) },
     });
-
-    if (!pagoExistente) {
-      return res.status(404).json({ error: "Pago no encontrado" });
-    }
 
     const credito = await prisma.credito.findUniqueOrThrow({
       where: { id_credito },
@@ -116,19 +125,26 @@ const modificarPago = async (req, res) => {
       });
     });
 
+    if (pagoActualizado == null) {
+      return res.status(503).json("Servicio no disponible");
+    }
+
     return res.status(200).json(pagoActualizado);
 
   } catch (error) {
     if (validateNotFoundInPrisma(error)) {
       return res.status(404).json();
     }       
-    console.error(error);
-    return res.status(503).json({ error: "Servicio no disponible" });
+    loggerMiddleware.error(error.message);
+    return res.status(503).json("No se pudo contactar con el servicio");   
   }
 };
 const eliminarPago = async (req, res)=> {
   try{
-    if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+    if (!validationResult(req).isEmpty()) { 
+      loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+      return res.status(400).json(); 
+    } 
     const milisegundosAHoras = 1000 * 60 * 60;
     const tiempoParaAjuste = 7 * 24;
     const pago = await prisma.pago.findUniqueOrThrow({
@@ -151,7 +167,8 @@ const eliminarPago = async (req, res)=> {
     if (validateNotFoundInPrisma(err)) {
       return res.status(404).json();
     }   
-    return res.status(503).json();
+    loggerMiddleware.error(error.message);
+    return res.status(503).json("No se pudo contactar con el servicio");   
   }
 }
 

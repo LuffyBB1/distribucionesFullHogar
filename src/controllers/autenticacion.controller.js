@@ -7,13 +7,16 @@ const {
     signToken,
     validateToken
 } = require("../middleware/auth.jwt.handler");
-const { empty } = require("@prisma/client/runtime/library");
+const { loggerMiddleware } = require("../logging/logger");
 
 
 
 const login = async (req, res)=> {
     try {        
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(); }
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Model Validation failed: ${validationResult(req)}`);
+            return res.status(400).json(); 
+        }
         const usuario = await prisma.usuario.findFirstOrThrow({
             where: {email: req.body.email}
         });
@@ -29,14 +32,16 @@ const login = async (req, res)=> {
                 }
                 
             } catch (err){
+                loggerMiddleware.error(err.message);
                 return res.status(401).json({ error: "Usuario o contraseña inválidos" });
             }
         });
-    }catch(err){
-        console.log(err);
+    }catch(err){        
         if (validateNotFoundInPrisma(err)) {
+            loggerMiddleware.error(err.message);
             return res.status(401).json({ error: "Usuario o contraseña inválidos" });
         }    
+        loggerMiddleware.error(err.message);
         return res.status(503).json({ error: "No se pudo contactar con el servicio" });
     }
 }
@@ -55,7 +60,7 @@ const logout = async (req, res) => {
             return res.status(202).json();
         }
     } catch(err){
-        console.error(err);
+        loggerMiddleware.info.error(err.message);
         return res.status(503).json();
     }
 }

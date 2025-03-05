@@ -1,4 +1,5 @@
-const { prisma } = require("../../prisma/database.client.prisma");
+const { prisma } = require("../../prisma/database.client.prisma")
+const { loggerMiddleware } = require("../logging/logger");
 
 const roleRequirements = async (roleValue) => {
     const roles = Array();
@@ -62,6 +63,7 @@ const rolePolicyMiddlewareFactory = (roleValue) => {
     
     return async (req, res, next) => {
         try {
+            loggerMiddleware.info(`UserId ${req.userId} - claim policy is going to be challenged`);
             const user = await prisma.usuario.findFirstOrThrow({
                 where : {id_user : req.userId},
                 select: {
@@ -75,6 +77,7 @@ const rolePolicyMiddlewareFactory = (roleValue) => {
             user['isAuthenticated'] = req.isAuthenticated;
             const validation = await validateRoleRequirements(user, roleValue);
             if (validation == null || validation === false){
+                loggerMiddleware.info(`user: ${user.id} doesn't have right permissions to access.`)
                 return res.status(403).json();
             }
             user.roles = user.roles.map(urole => 
@@ -87,9 +90,10 @@ const rolePolicyMiddlewareFactory = (roleValue) => {
             } else{
                 req.isAdmin = false;
             }
+            loggerMiddleware.info(`UserId ${req.userId} - claim policy challenged successfully`);
             next();
         } catch(error){
-            console.error(error);
+            loggerMiddleware.error(`User authorization failed: ${error.message}`);
             return res.status(403).json();
         }        
     }

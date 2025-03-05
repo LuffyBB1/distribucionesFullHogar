@@ -1,5 +1,7 @@
-const { tokenValidationParams, requiredTokenPayloadClaims, generatePayload, signToken, validateToken } = require("./auth.jwt.handler");
+const { requiredTokenPayloadClaims, validateToken } = require("./auth.jwt.handler");
 const { prisma } = require("../../prisma/database.client.prisma");
+const { loggerMiddleware } = require("../logging/logger");
+
 
 const JwtSchemeAuthorization  = async(req, res, next) => {
     try{
@@ -17,9 +19,10 @@ const JwtSchemeAuthorization  = async(req, res, next) => {
         req.userId = payload.sub;
         req.isAuthenticated = true
         req.authToken = payload.jti
+        loggerMiddleware.info(`UserId ${payload.sub} authentication successfully`);
         next();
     } catch(err){
-        console.error(err);
+        loggerMiddleware.error(`User authentication failed: ${err.message}`);
         return res.status(401).json("Unauthorized"); 
     }
 

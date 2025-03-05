@@ -1,13 +1,17 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const { getAllCreditsReport, getReport, getUserCreditReport } = require('@prisma/client/sql');
-const {validateNotFoundInPrisma} = require("../../utils/validatemodels");
+const { validateNotFoundInPrisma } = require("../../utils/validatemodels");
+const { loggerMiddleware } = require("../logging/logger");
 const { validationResult } = require("express-validator");
 
 
 
 const estadoFinancieroClientes = async(req, res)=> {
-    try {
-        
+    try {        
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json();; 
+        }     
         let { page, limit } = req.query;
         if (limit === undefined) {
             limit = 50;
@@ -24,14 +28,17 @@ const estadoFinancieroClientes = async(req, res)=> {
         return res.status(200).json(reporte);
 
     } catch (error) {
-        console.error(error);
-        return res.status(503).json({ error: "No se pudo crear el reporte" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }
 }
 
 const historialCliente = async (req, res) => {
     try {
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json(); 
+        } 
         const { id } = req.params;
         let { page, limit } = req.query;
         if (limit === undefined) {
@@ -77,13 +84,17 @@ const historialCliente = async (req, res) => {
         if (validateNotFoundInPrisma(error)) {
             return res.status(404).json("El cliente no existe");
         }         
-        return res.status(503).json({ error: "No se pudo crear el reporte" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }   
 }
 
 const resumenCliente = async(req, res) => {
     try {
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(); } 
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json(); 
+        } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         const { id } = req.params;
         let filter;
@@ -120,23 +131,27 @@ const resumenCliente = async(req, res) => {
             estado: estadoCreditos
         });        
     } catch (error) {
-        console.error(error);
         if (validateNotFoundInPrisma(error)) {
             return res.status(404).json();
         }         
-        return res.status(503).json({ error: "No se pudo crear el reporte" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }    
 }
 
 const resumenFinancieroPeriodico = async(req, res)=> {
     try {
-        if (!validationResult(req).isEmpty()) { return res.status(400).json(validationResult(req)); } 
+        if (!validationResult(req).isEmpty()) { 
+            loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
+            return res.status(400).json();; 
+        } 
         const { fechaInicial, fechaFinal } = req.query;        
         const reporte = await prisma.$queryRawTyped(getReport(
                 new Date(fechaInicial), new Date(fechaFinal)));
         
         if (reporte == null) {
-            return res.status(500).json();        
+            loggerMiddleware.error("No se encontró un reporte de acuerdo con los parámetros de búsqueda");
+            return res.status(404).json();        
         }
         const {total_creditos, total_pagos } = reporte[0];
         return res.status(200).json({
@@ -145,12 +160,10 @@ const resumenFinancieroPeriodico = async(req, res)=> {
             total_pagos: parseInt(total_pagos)
         });
     } catch(error) {
-        console.error(error);
-        return res.status(503).json({ error: "No se pudo crear el reporte" });
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("No se pudo contactar con el servicio");   
     }
 }
-
-
 
 module.exports = {
     estadoFinancieroClientes,
