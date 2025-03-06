@@ -1,0 +1,5 @@
+model Token {
+    id Int @id @default(autoincrement())
+    jti String  @db.Uuid @unique
+    fecha_ban DateTime @default(now())
+}

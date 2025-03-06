@@ -1,0 +1,7 @@
+model Pago {
+  id_pago       Int      @id @default(autoincrement())
+  id_credito    Int
+  monto_pago    Int
+  fecha_pago    DateTime @default(now())
+  credito       Credito  @relation(fields: [id_credito], references: [id_credito])
+}

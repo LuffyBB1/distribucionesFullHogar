@@ -1,0 +1,4 @@
+model Role {
+    id String @id @db.Uuid @default(uuid()) @unique
+    Name String @unique
+}

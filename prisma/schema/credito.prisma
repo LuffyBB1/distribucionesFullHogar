@@ -1,0 +1,22 @@
+model Credito {
+  id_credito    Int     @id @default(autoincrement())
+  id_cliente    Int?
+  monto_total   Int
+  cuotas        Int
+  fecha_inicio  DateTime @default(now())
+  frecuencia_pago TipoDePago
+  estado        EstadoCredito @default(PENDIENTE)
+  cliente       Cliente? @relation(fields: [id_cliente], references: [id_cliente])
+  pagos         Pago[]
+}
+
+
+enum TipoDePago {
+  MENSUAL
+  QUINCENAL
+}
+
+enum EstadoCredito {
+  PAGADO
+  PENDIENTE
+}

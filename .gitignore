@@ -8,7 +8,7 @@ npm-debug.log*
 # 📂 Archivos de logs
 logs
 *.log
-logs/
+*logs/
 npm-debug.log*
 
 # 🔍 Caché y archivos temporales
@@ -29,3 +29,5 @@ package-lock.json
 
 # 🚀 Directorios generados por herramientas de compilación
 coverage/
+*-audit.json*
+*audit*
