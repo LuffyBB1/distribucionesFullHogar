@@ -5,7 +5,7 @@ const clienteInfo  = {
         exists: true, 
         notEmpty: true,
         isString: true,
-        isLength: { options: { min: 8 } },
+        isLength: { options: { min: 7 } },
         escape: true,
         trim: true
     },

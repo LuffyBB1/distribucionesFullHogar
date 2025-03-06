@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 const { validationResult } = require("express-validator");
 const {  validateNotFoundInPrisma, validateUniqueFieldViolation} = require("../../utils/validatemodels");
 const { loggerMiddleware } = require("../logging/logger");
-const { cli } = require("winston/lib/winston/config");
+
 
 const crearCliente = async (req, res) => {
   try {
@@ -14,8 +14,14 @@ const crearCliente = async (req, res) => {
     } 
     // const {nombre, telefono, direccion, documentoIdentidad} = req.body; 
     const cliente = await prisma.cliente.findFirst({
-      where: {telefono : req.body.telefono},
+      where: {
+        OR:[
+          {telefono : req.body.telefono},
+          {documentoIdentidad : req.body.documentoIdentidad}
+        ]
+      },
       select:{
+        documentoIdentidad: true,
         telefono: true,
         usuario:{
           select: {
@@ -24,15 +30,19 @@ const crearCliente = async (req, res) => {
         }
       }
     });
+
     if (cliente != null) {
-      if (cliente.telefono != null) {    
-        return res.status(400).json({message: "El número de teléfono ya está registrado"});
+      if (cliente.documentoIdentidad === req.body.documentoIdentidad) { 
+        return res.status(409).json({message: "El documento de identidad ya está registrado"});
       }
-      if (cliente.email != null) {
-        return res.status(400).json({message: "El email ya está registrado"});
+      if (cliente.email === req.body.email ) {        
+          return res.status(409).json({message: "El email ya está registrado"});
+      }
+      if (cliente.telefono === req.body.telefono) {  
+        return res.status(409).json({message: "El número de teléfono ya está registrado"});
       }
     }
-
+  
     let usuario = await prisma.usuario.findFirst({
       where: {email: req.body.email.toLowerCase()}
     });
@@ -44,8 +54,10 @@ const crearCliente = async (req, res) => {
       }
     });
     const hash = await bcrypt.hash(`${req.body.documentoIdentidad}-${req.body.nombre.toLowerCase().split(" ")[0]}`, saltRounds);      
-    const clienteCreado = await prisma.$transaction(async (tx)=>{   
-    if (usuario == null) {
+    try {
+    const clienteCreado = await prisma.$transaction(async (tx)=>{
+
+      if (usuario == null) {  
         usuario = await tx.usuario.create({
           data: {
             email : req.body.email.toLowerCase(),
@@ -54,6 +66,7 @@ const crearCliente = async (req, res) => {
           }
         })        
       }
+  
       const clienteCreado= await tx.cliente.create({data:{
         nombre : req.body.nombre,
         telefono: req.body.telefono,
@@ -63,22 +76,28 @@ const crearCliente = async (req, res) => {
       }});
       return clienteCreado;
     });
-    if (clienteCreado) {
+    
       return res.status(201).json({"message": "Usuario creado correctamente",
         cliente_id : `${process.env.HOST}/api/clientes/${clienteCreado.documentoIdentidad}`});
+
     }
-    else {      
-      return res.status(409).json({ error: "Ya se encuentra registrado un usuario con la información enviada" });
+    catch(err) {
+      loggerMiddleware.error(err.message);     
+      return res.status(503).json({ error: "Servicio no disponible" });
     }
     
   } catch (error) {
     if (validateUniqueFieldViolation(error)){
-      return  res.status(409).json("Telefono o documento de indentidad ya se encuentra registrado")
+      loggerMiddleware.error(error.message);
+      return  res.status(409).json("El correo ya se encuentra registrado")
     }
     loggerMiddleware.error(error.message);
+
     return res.status(503).json({ error: "Servicio no disponible" });
   }
 }
+
+
 
 const editarCliente = async(req, res) => {
   try {
@@ -115,6 +134,9 @@ const editarCliente = async(req, res) => {
     if (validateNotFoundInPrisma(error)) {
       return res.status(404).json();
     }    
+    if (validateUniqueFieldViolation(error)){
+      return  res.status(409).json("Telefono ya se encuentra registrado")
+    }    
     loggerMiddleware.error(error.message);
     return res.status(503).json({ error: "Servicio no disponible" });
   }  
@@ -130,13 +152,13 @@ const eliminarCliente = async(req, res) => {
     const cliente = await prisma.cliente.findUniqueOrThrow({
       where: {documentoIdentidad : id}})
     if (cliente.estado_credito) {
-      return res.status(400).json({
-        error: "No puedes eliminar este cliente porque tiene créditos activos."});
+      return res.status(409).json({
+        error: "No se puede eliminar este cliente porque tiene créditos activos."});
     }
     const clienteEliminado = await prisma.cliente.delete({
       where: { documentoIdentidad: id }
     });
-    return res.status(200).json({message: `Usuario con id: ${clienteEliminado.documentoIdentidad} eliminado con éxito.`});
+    return res.status(200).json({message: `Cliente con id: ${clienteEliminado.documentoIdentidad} eliminado con éxito.`});
   } catch (error) {
     if (validateNotFoundInPrisma(error)) {
       return res.status(404).json();
@@ -149,26 +171,27 @@ const eliminarCliente = async(req, res) => {
 const obtenerClientePorId = async (req, res) =>{
   try{
     if (!validationResult(req).isEmpty()) { return res.status(400).json(); }    
-    const { id } = req.params;
-
-    cliente = await prisma.cliente.findFirst({
-      where: {documentoIdentidad: id},
-      relationLoadStrategy: 'join', 
-      include:{ 
-        creditos: {
-          include: {
-            pagos: {
-            orderBy: {
-              fecha_pago : 'asc'
+      
+      await actualizarEstadoCreditoCliente(req.params.id);
+      cliente = await prisma.cliente.findFirst({
+        where: {documentoIdentidad: req.params.id},
+        relationLoadStrategy: 'join', 
+        include:{ 
+          creditos: {
+            include: {
+              pagos: {
+              orderBy: {
+                fecha_pago : 'asc'
+                }
               }
-            }
+            },
           },
-        },
-      }
-    });
+        }
+      });
       if (cliente == null) {
         return res.status(404).json({message: "No se encontró el cliente"});
       }
+      
       return res.status(200).json({"cliente": cliente});    
     } catch (error) {
       if (validateNotFoundInPrisma(error)) {
@@ -181,6 +204,14 @@ const obtenerClientePorId = async (req, res) =>{
 
 const obtenerClientes = async (req, res) => {
     try {
+      const documentos = (await prisma.cliente.findMany({
+        select: { documentoIdentidad: true }
+      }))
+      .map(cliente => cliente.documentoIdentidad);
+      if (documentos.length === 0) {
+        return res.status(204).json(Array());
+      }
+
       const clientes = await prisma.cliente.findMany({
         select: {
           id_cliente: true,
@@ -191,10 +222,7 @@ const obtenerClientes = async (req, res) => {
           fecha_registro: true,
         }
       });
-      if (clientes.length == 0) {
-        return res.status(204).json(clientes);
-      }
-      res.status(200).json(clientes);
+      return res.status(200).json(clientes);      
     } catch (error) {
       loggerMiddleware.error(error.message);
       return res.status(503).json({ error: "Servicio no disponible" });
@@ -208,6 +236,37 @@ const obtenerTelefonosRegistrados = async () => {
         }
     }))
     .map(cliente => cliente.telefono);
+}
+
+const actualizarEstadoCreditoCliente = async (documentoIdentidad) => {
+  console.log(documentoIdentidad);
+  const estadosCreditos = (await prisma.credito.findMany({
+    where: {
+      cliente: {
+        documentoIdentidad : documentoIdentidad
+      }
+    },
+    select: { estado: true }
+  })) ?? {estado: "PAGADO"}
+  .map(credito => {
+
+    if (credito.estado === "PAGADO"){
+      return true;
+    } else {
+      return false
+    }
+  });
+
+  if (estadosCreditos.every(Boolean)) {
+    await prisma.cliente.update({
+      where: {documentoIdentidad: documentoIdentidad},
+      data: {
+        estado_credito: false
+      }
+    });
+  }
+
+
 }
 
 module.exports = { 

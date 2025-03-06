@@ -41,5 +41,5 @@ try {
   });
 } catch(err){
   
-  loggerMiddleware.error($`La aplicación se detuvo debido a: {err.message}`);
+  loggerMiddleware.error($`La aplicación se detuvo debido a: {err}`);
 }

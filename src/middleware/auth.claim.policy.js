@@ -93,7 +93,7 @@ const rolePolicyMiddlewareFactory = (roleValue) => {
             loggerMiddleware.info(`UserId ${req.userId} - claim policy challenged successfully`);
             next();
         } catch(error){
-            loggerMiddleware.error(`User authorization failed: ${error.message}`);
+            loggerMiddleware.error(`User authorization failed: ${error}`);
             return res.status(403).json();
         }        
     }

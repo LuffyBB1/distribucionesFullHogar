@@ -20,8 +20,13 @@ const estadoFinancieroClientes = async(req, res)=> {
 
         const reporte = await prisma.$queryRawTyped(getAllCreditsReport(parseInt(limit), parseInt(offset)));        
         if (reporte == null){
-            return res.status(500).json();  
+            loggerMiddleware.error(error.message);
+            return res.status(503).json("No se pudo contactar con el servicio");   
         }
+        if (reporte.length === 0){
+            loggerMiddleware.error(error.message);
+            return res.status(204).json(Array());   
+        }        
         reporte.forEach(cliente => {
             cliente.saldo_total = parseInt(cliente.saldo_total);
         });        
@@ -80,7 +85,7 @@ const historialCliente = async (req, res) => {
 
     } 
     catch (error) {
-        console.error(error);
+        console.error(error.message);
         if (validateNotFoundInPrisma(error)) {
             return res.status(404).json("El cliente no existe");
         }         
@@ -100,11 +105,11 @@ const resumenCliente = async(req, res) => {
         let filter;
         if (req.isAdmin) {
             filter = {
-                id_cliente: parseInt(id)
+                id_cliente: req.params.id
             };
         } else {
             filter = {
-                id_cliente: parseInt(id),
+                id_cliente: req.params.id,
                 id_usuario: req.userId
             };
         }        
@@ -117,7 +122,7 @@ const resumenCliente = async(req, res) => {
         });
         
         const estadoCreditos = (await prisma.$queryRawTyped(
-            getUserCreditReport(parseInt(id))));
+            getUserCreditReport(req.params.id)));
         
         estadoCreditos.forEach(credito => {
             credito.monto_total = parseInt(credito.monto_total);

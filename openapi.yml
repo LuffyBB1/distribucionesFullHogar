@@ -1,0 +1,1178 @@
+openapi: 3.0.0
+info:
+  title: Full Hogar
+  description: API del sistema 
+  version: 1.0.0
+servers:
+  - url: 'https://localhost:3000/api'
+    description: 'Base URL for the API'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+tags:
+  - name: Autenticacion
+    description: Acciones de inicio y cierre de sesión
+    externalDocs:
+      description: Find out more
+      url: http://swagger.io
+  - name: Clientes
+    description: Recurso relacionado con la persona asociada a una cuenta de crédito. Una cuenta puede tener varios créditos asociados
+    externalDocs:
+      description: Find out more about our store
+      url: http://swagger.io
+  - name: Usuarios
+    description: Recurso relacionado con la cuenta de un usuario en la plataforma. Un usuario puede existir sin la creación de un cliente ya que existen varios roles definidos.
+  - name: Créditos
+    description: Recurso relacionado con una compra adquirida a crédito
+  - name: Pagos
+    description: Recurso relacionado con el pago de una cuota de crédito   
+  - name: Reportes
+    description: Recurso relacionado con la generación de balances financieros e historiales créditicios
+    
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Autenticacion
+      summary: Inicia sesión del usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: Cuenta de email válida
+                password:
+                  type: string
+                  description: Una contraseña con más de 5 caracteres
+      responses:
+        '200':
+          description: Retorna JWT Token de sesión.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "JWT token"
+              example:
+                token: "generated token"        
+        '401':
+          description: Las credenciales son inválidas o el usuario no existe.
+        '400':
+          description: Se obtiene cuando no se supera la validacion del input
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos
+          
+  /auth/logout:
+    post:
+      tags:
+        - Autenticacion
+      summary: Cierra la sesión del usuario
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Coloca el token utilizado en el header en la lista de negra de tokens bloqueados.
+
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos.       
+          
+  /clientes/{documento_identidad}:
+    get:
+      tags:
+        - Clientes
+      summary: Obtiene la información básica de una cuenta de crédito
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documento_identidad
+          in: path
+          required: true
+          description: "Documento de identidad del usuario. Debe tener mínimo 7 caracteres"
+          schema:
+            type: integer
+            example: "1234567890"   
+      responses:
+        '200':
+          description: Retorna toda la información de la cuenta del cliente. Esto incluye los créditos y sus respectivos pagos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cliente:
+                    type: object
+                    example: "Usuario"
+              example:
+                cliente:
+                  id_cliente: 2,
+                  nombre: usuario de prueba,
+                  telefono: 3229944240,
+                  direccion: my_casa,
+                  documentoIdentidad: 1023456778,
+                  estado_credito: true,
+                  fecha_registro: 2025-02-27T04:27:22.529Z,
+                  id_usuario: 683efd01-61b0-4db0-b3e6-9831b6c47b30,
+                  creditos: []
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params        
+        '403':
+          description: Se obtiene cuando un usuario que no es administrador intenta acceder a un id_cliente diferente al suyo              
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos
+    patch:
+      tags:
+        - Clientes
+      summary: Modificación de información personal de un cliente. Debe enviarse al menos un campo para modificar
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: documento_identidad
+          in: path
+          required: true
+          description: "Documento de identidad del usuario. Debe tener mínimo 7 caracteres"
+          schema:
+            type: integer
+            example: "1234567890"           
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  description: Nombre del cliente con apellidos. Debe tener más de 7 carácteres o más
+                telefono:
+                  type: string
+                  description: Número de teléfono válido para Colombia. Debe tener 10 dígitos.
+                dirección:
+                  type: string
+                  description: Dirección válida para Colombia. Debe tener 8 caracteres como mínimo.
+
+      responses:
+        '201':
+          description: Retorna dirección url del recurso cliente creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  cliente_id:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                message: "Cliente actualizado correctamente"
+                id_cliente: "http://localhost:3000/api/clientes/1321371849"
+        '403':
+          description: Se obtiene cuando un usuario que no es administrador intenta acceder a un id_cliente diferente al suyo                    
+        '404':
+          description: El documento de identidad no esta relacionado con algun cliente      
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body 
+        '409':
+          description: El  el telefono  ya esta registrado en el sistema
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos     
+    delete:
+      tags:
+        - Clientes
+      summary: Elimina un cliente
+      parameters:
+        - name: documento_identidad
+          in: path
+          required: true
+          description: "Identificador único del cliente"
+          schema:
+            type: string
+            example: "1032456762"
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje con id del usuario eliminado
+              example:
+                message: "Cliente con id: 1032456762 fue eliminado con éxito"
+        '400':
+          description: Se obtiene al no superar la validación del UUID. También se puede obtener si  cliente tiene créditos activos (En estado ACTIVO);
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos  
+                                        
+  /clientes:
+    get:
+      tags:
+        - Clientes
+      summary: Obtiene el listado de clientes registrados
+      responses:
+        '200':
+          description: Retorna la información de las cuentas del registradas sin incluir información de los créditos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: object
+              example:
+                - id_cliente: 2,
+                  nombre: usuario de prueba,
+                  telefono: 3229944240,
+                  direccion: my_casa,
+                  estado_credito: true,
+                  fecha_registro: 2025-02-27T04:27:22.529Z
+                - id_cliente: 6
+                  nombre: Cliente de prueba 2
+                  telefono: 3148989765
+                  direccion: la_casa_de_prueba
+                  estado_credito: true
+                  fecha_registro: 2025-03-04T22:15:56.595Z                  
+        '204':
+          description: Operación exitosa pero no hay clientes registrados. Retorna un arreglo vacío    
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body          
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos        
+    post:
+      tags:
+        - Clientes
+      summary: Creación de un cliente. Debido a la relación cliente - usuario, al momento de crear un cliente se crea también un usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                documentoIdentidad:
+                  type: string
+                  description: Número de documento de identidad válido con 7 carácteres o más
+                nombre:
+                  type: string
+                  description: Nombre del cliente con apellidos. Debe tener más de 7 carácteres o más
+                telefono:
+                  type: string
+                  description: Número de teléfono válido para Colombia. Debe tener 10 dígitos.
+                dirección:
+                  type: string
+                  description: Dirección válida para Colombia. Debe tener 8 caracteres como mínimo.
+                email:
+                  type: string
+                  description: Dirección de email válida.
+              required:
+                - documentoIdentidad
+                - nombre
+                - telefono
+                - dirección
+                - email
+      responses:
+        '201':
+          description: Retorna dirección url del recurso cliente creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  cliente_id:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                message: "Cliente creado correctamente"
+                id_cliente: "http://localhost:3000/api/clientes/1321371849"
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body
+        '409':
+          description: El documento de identidad, el telefono o el email ya estan registrados en el sistema.
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos
+          
+  /usuarios/{uuid}:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtiene la información de un usuario y la información básica de la cuenta de crédito (cliente) asociada.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          description: "Identificador único del usuario"
+          schema:
+            type: string
+            example: "9fda4705-f025-4581-ab87-db6ce81523850"        
+      responses:
+        '201':
+          description: Retorna dirección url del recurso usuario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  id_cliente:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                id_user: 9fda4705-f025-4581-ab87-db6ce8152385,
+                email: takamura1@gmail.com,
+                emailConfirmed: false,
+                roles: 
+                    - d3e41063-852a-463f-9c0e-85a19d9ce1c3
+                signup_date: 2025-03-05T21:30:00.108Z,
+                client: 
+                    id_cliente: 7,
+                    nombre: usuario de prueba,
+                    telefono: 31055470410,
+                    direccion: la_casa_de_takamura,
+                    documentoIdentidad: 1321371849,
+                    estado_credito: true,
+                    fecha_registro: 2025-03-05T21:30:00.382Z,
+                    id_usuario: 9fda4705-f025-4581-ab87-db6ce8152385
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body
+        '403':
+          description: Se obtiene cuando un usuario sin permisos de administrador intenta acceder a un uuid diferente al asociado a su usuario         
+        '404':
+          description: El uuid no esta relacionado con algun usuario
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos   
+    patch:
+      tags:
+        - Usuarios
+      summary: Modificación de información personal de un cliente
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          description: "Identificador único del usuario"
+          schema:
+            type: string
+            example:  "9fda4705-f025-4581-ab87-db6ce81523850"            
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: Dirección de correo electrónico válida
+                password:
+                  type: string
+                  description: Contraseña con 8 carácteres o más
+
+      responses:
+        '201':
+          description: Retorna dirección url del recurso usuario modificado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  cliente_id:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                message: "Cliente actualizado correctamente"
+                id_cliente: "http://localhost:3000/api/clientes/1321371849"
+        '404':
+          description: El uuid no esta relacionado con algun usuario
+        '403':
+          description: Se obtiene cuando un usuario sin permisos de administrador intenta acceder a un uuid diferente al asociado a su usuario                
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body 
+        '409':
+          description: El correo electrónicoya esta registrado en el sistema
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos 
+    
+    delete:
+      tags:
+        - Usuarios
+      summary: Elimina un usuario
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          description: "Identificador único del cliente"
+          schema:
+            type: string
+            example: "9fda4705-f025-4581-ab87-db6ce81523850"
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje con id del usuario eliminado
+              example:
+                message: "Usuario con id: 9fda4705-f025-4581-ab87-db6ce81523850 fue eliminado con éxito"
+        '400':
+          description: Se obtiene al no superar la validación del UUID
+        '403':
+          description: Se obtiene cuando un usuario sin permisos de administrador intenta acceder a un uuid diferente al asociado a su usuario     
+        '404':
+          description: El uuid no esta relacionado con algun usuario          
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos  
+            
+  /usuarios:
+    get:
+      tags:
+        - Usuarios
+      summary: Obtiene el listado de usuarios registrados
+      responses:
+        '200':
+          description: Retorna la información de los usuarios registrados incluyendo el nombre del cliente relacionado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: object
+              example:
+                - id_user: 42e881db-e7b8-46c9-b09a-0169abffc617
+                  email: my_email31_@email.com
+                  roles: 
+                    - d3e41063-852a-463f-9c0e-85a19d9ce1c3
+                    - 23fad1f2-d83f-4038-968c-282e2b5310a1
+                  client: 
+                    nombre: usuario de prueba
+              
+        '204':
+          description: Operación exitosa pero no hay clientes registrados. Retorna un arreglo vacío    
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body          
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos          
+    post:
+      tags:
+        - Usuarios
+      summary: Creación de un usuario. Si existe un cliente con el mismo número de documento de identidad, realizará la vinculación de estas entidades.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                documentoIdentidad:
+                  type: string
+                  description: Número de documento de identidad válido con 7 carácteres o más
+                password:
+                  type: string
+                  description: Contraseña con 8 carácteres o más
+                roles:
+                  type: string
+                  description: Nombre del rol inicial que se le quiere asignar.
+                email:
+                  type: string
+                  description: Dirección de email válida. 
+      responses:
+        '201':
+          description: Retorna dirección url del recurso usario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  cliente_id:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                message: "Usuario creado correctamente"
+                id_cliente: "http://localhost:3000/api/usuarios/1321371849"
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body
+        '409':
+          description: El documento de identidad, el telefono o el email ya estan registrados en el sistema.
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos  
+          
+  /creditos/{id_credito}:
+    patch:
+      tags:
+        - Créditos
+      summary: Modificar el estado de un crédito luego de que ha sido pagado
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_credito
+          in: path
+          required: true
+          description: "Identificador único del crédito"
+          schema:
+            type: integer
+            example:  1           
+      responses:
+        '200':
+          description: Mensaje de confirmación del éxito de la operación
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+
+              example:
+                message: "Crédito con id: 1 fue fue marcado como pagado"
+        '204':
+          description: El crédito ya se encuentra con estado de PAGADO
+        '400':
+          description: Se obtiene cuando no se supera la validacion del id
+        '404':
+          description: El id no esta relacionado con algun crédito
+        '409':
+          description: Se obtiene cuando el crédito ya esta pagado por lo que no se puede modificar
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos  
+    put:
+      tags:
+        - Créditos
+      summary: Modificación de la información de un crédito
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_credito
+          in: path
+          required: true
+          description: "Identificador único del crédito"
+          schema:
+            type: integer
+            example:  1           
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                monto_total:
+                  type: integer
+                  description: Valor del crédito
+                frecuencia_pago:
+                  type: string
+                  description: Solo puede contener "QUINCENAL" o "MENSUAL"
+                cuotas:
+                  type: integer
+                  description: Corresponde al número de cuotas                  
+
+      responses:
+        '200':
+          description: Retorna dirección url del recurso cliente creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+
+              example:
+                message: "Crédito actualizado exitosamente"
+        '404':
+          description: El id no esta relacionado con algun crédito
+             
+        '400':
+          description: Se obtiene cuando no se supera la validacion del id o de la información del crédito a modificar
+        '409':
+          description: Se obtiene cuando el crédito ya esta pagado por lo que no se puede modificar
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos 
+    
+    delete:
+      tags:
+        - Créditos
+      summary: Elimina un crédito
+      parameters:
+        - name: id_credito
+          in: path
+          required: true
+          description: "Identificador único del crédito"
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje con id del crédito eliminado
+              example:
+                message: "Crédito con id: 1 fue eliminado con éxito"
+        '400':
+          description: Se obtiene al no superar la validación del id
+        '404':
+          description: El id no esta relacionado con algun crédito       
+        '409':
+          description: Se obtiene al intentar eliminar un crédito que registra pagos relacionados.          
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos  
+            
+  /creditos:
+    get:
+      tags:
+        - Créditos
+      summary: Obtiene la información de todos los créditos de un cliente sin incluir los pagos realizados
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_cliente
+          in: query
+          required: true
+          description: "Identificador único del cliente"
+          schema:
+            type: integer
+            example: 1        
+      responses:
+        '200':
+          description: Retorna un arreglo con la información de los créditos asociados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: object
+              example:
+                - id_credito: 1
+                  id_cliente: 3
+                  monto_total: 19000000
+                  cuotas: 100
+                  fecha_inicio: 2025-02-27T21:41:22.854Z
+                  frecuencia_pago: "MENSUAL"
+                  estado: "PAGADO"
+                - id_credito: 2
+                  id_cliente: 3
+                  monto_total: 9400000
+                  cuotas: 100
+                  fecha_inicio: 2025-02-27T21:41:22.854Z
+                  frecuencia_pago: "MENSUAL"
+                  estado: "PENDIENTE"
+        '400':
+          description: Se obtiene cuando no se supera la validacion del id de cliente
+        '404':
+          description: El id no esta relacionado con algun cliente
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos       
+    post:
+      tags:
+        - Créditos
+      summary: Creación de un crédito
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_cliente:
+                  type: integer
+                  description: Identificador único de un cliente
+                monto_total:
+                  type: integer
+                  description: Valor del crédito en pesos
+                cuotas:
+                  type: integer
+                  description: Número de cuotas en los que será pagado el crédito
+                frecuencia_pago:
+                  type: string
+                  description: Modalidad de pago. Únicamente acepta "MENSUAL" o "QUINCENAL" 
+      responses:
+        '201':
+          description: Retorna dirección url del recurso usario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+                  cliente_id:
+                    type: string
+                    example: Dirección url para acceder al recurso
+              example:
+                message: "Crédito creado correctamente"
+                id_credito: "http://localhost:3000/api/creditos/1"
+        '400':
+          description: Se obtiene cuando no se supera la validacion del documento de identidad pasado mediante params o body
+        '409':
+          description: El documento de identidad, el telefono o el email ya estan registrados en el sistema.
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos            
+  
+  /pagos/clientes/{id_cliente}:
+    get:
+      tags:
+        - Pagos
+      summary: Obtiene la información de todos los pagos realizados por un cliente
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_cliente
+          in: path
+          required: true
+          description: "Identificador único del cliente"
+          schema:
+            type: integer
+            example: 1        
+      responses:
+        '200':
+          description: Retorna un arreglo con la información de los créditos asociados y la información de cada uno de los pagos realizados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                    type: object
+              example:
+                - id_credito: 1
+                  id_cliente: 3
+                  monto_total: 19000000
+                  cuotas: 100
+                  fecha_inicio: 2025-02-27T21:41:22.854Z
+                  frecuencia_pago: "MENSUAL"
+                  estado: "PAGADO"
+                  pagos:
+                    - id_pago: 3
+                      id_credito: 1,
+                      monto_pago: 100000,
+                      fecha_pago: "2025-02-27T22:05:55.250Z" 
+                    - id_pago: 4
+                      id_credito: 1,
+                      monto_pago: 100000,
+                      fecha_pago: "2025-03-27T22:05:55.250Z"                         
+
+        '400':
+          description: Se obtiene cuando no se supera la validacion del id de cliente
+        '404':
+          description: El id no esta relacionado con algun cliente
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos       
+  /pagos:  
+    post:
+      tags:
+        - Pagos
+      summary: Creación de un pago
+      security:
+        - BearerAuth: []      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_credio:
+                  type: integer
+                  description: Identificador único de un crédito
+                monto_pago:
+                  type: integer
+                  description: Valor del pago en pesos
+ 
+      responses:
+        '201':
+          description: Retorna dirección url del recurso usario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+
+              example:
+                message: "Pago con id:1 fue creado exitosamente"
+
+        '400':
+          description: Se obtiene cuando no se supera la validacion del monto o del id_cliente
+        '409':
+          description: Se puede obtener en dos escenarios 1) el crédito ya esta pagado 2) la suma de todos los pagos anteriores más la suma del pago que se pretende registrar supera el valor del crédito
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos 
+  
+  /pagos/{id_pago}:
+    put:
+      tags:
+        - Pagos
+      summary: Modificación de la información de un pago
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_pago
+          in: path
+          required: true
+          description: "Identificador único del pago"
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id_credito:
+                  type: integer
+                  description: Identificador único del nuevo crédito
+                monto_pago:
+                  type: integer
+                  description: Nuevo valor del pago
+      responses:                  
+        '200':
+          description: Retorna dirección url del recurso usario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje de confirmación del éxito de la operación
+
+              example:
+                message: "Pago con id:1 fue modificado exitosamente"
+
+        '400':
+          description: Se obtiene cuando no se supera la validacion del monto o del id_credito
+        '404':
+          description: El id de credito o el id del pago no estan relacionados con algún registro de la base de datos
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos       
+      
+    delete:
+      tags:
+        - Pagos
+      summary: Elimina un pago
+      security:
+        - BearerAuth: []      
+      parameters:
+        - name: id_pago
+          in: path
+          required: true
+          description: "Identificador único del crédito"
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje con id del usuario eliminado
+              example:
+                message: "Pago con id: 1 fue eliminado con éxito"
+        '400':
+          description: Se obtiene al no superar la validación del id_pago
+        '404':
+          description: El id_pago no esta relacionado con algun pago         
+        '409':
+          description: Se obtiene si el pago fue registrado hace más de 7 días por lo que no puede eliminarse o si el crédito ya se encuentra pagado
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos
+          
+  /reportes/estado_cuentas:
+    get:
+      tags:
+        - Reportes
+      summary: Obtiene un reporte del monto adeudado por los clientes con créditos sin pagar
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: true
+          description: Número de página para filtrar resultados
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: true
+          description: Número de elementos mostrados en una página
+          schema:
+            type: integer
+            example: 10 
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: array
+                example: Lista de los clientes que tienen dedudas y su respectivo monto 
+                items:
+                  type: object
+                  properties:
+                    id_cliente:
+                      type: integer
+                    nombre:
+                      type: string
+                    saldo_total:
+                      type: integer
+                      example: monto total de la deuda a la fecha
+              example:
+                - id_cliente: 3
+                  nombre: Usuario de prueba
+                  saldo_total: 162000000
+                - id_cliente: 4
+                  nombre: Usuario de prueba 2
+                  saldo_total: 1600                  
+        '204':
+          description: Se retorna un arreglo vacío cuando todos los clientes no tienen deudas      
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos            
+      
+  /reportes/resumen:
+    get:
+      tags:
+        - Reportes  
+      summary: Obtiene un reporte financiero entre dos fecha especifícas
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fechaInicial
+          in: query
+          required: false
+          description: Número de página para filtrar resultados
+          schema:
+            type: string
+            example: "2025-02-28T23:46:54.425"
+        - name: fechaFinal
+          in: query
+          required: false
+          description: Número de elementos mostrados en una página
+          schema:
+            type: string
+            example: "2025-03-04T23:46:54.425"   
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  periodo:
+                    type: string
+                    example: Mensaje que muestra la fecha de inicio y fin del reporte
+                  total_creditos:
+                    type: integer
+                    example: Monto total adeudado por todos los clientes
+                  total_pagos:
+                    type: integer
+                    example: Monto total pagado por todos los clientes                    
+              example:
+                periodo: "2025-02-26T20:46:54.425 - 2025-03-05T23:46:54.425"
+                total_creditos: 19000000
+                total_pagos: 18900000
+        '400':
+          description: Se obtiene cuando no supera la validación de las fechas de inicio y fin
+        '404':
+          description: No se encuentran registros de créditos o pagos en el periodo del informe     
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos 
+          
+  /reportes/resumen/clientes/{id_cliente}:
+    get:
+      summary: Obtiene un reporte que muestra el valor de los créditos y el monto total pagado en cada uno de ellos 
+      tags:
+        - Reportes
+      security:
+        - BearerAuth: []  
+      parameters:
+        - name: id_cliente
+          in: path
+          required: true
+          description: Identificador único del cliente
+          schema:
+            type: integer
+            example: 1
+        - name: page
+          in: query
+          required: true
+          description: Número de página para filtrar resultados
+          schema:
+            type: integer
+            example: 1
+        - name: limit
+          in: query
+          required: true
+          description: Número de elementos mostrados en una página
+          schema:
+            type: integer
+            example: 10 
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Mensaje con el url al recurso del cliente
+                  estados:
+                    type: array
+                    example: Contiene todos los montos adeudados y el monto total pagado en cada crédito
+                    items:
+                      type: object
+              example:
+                message: "http://localhost:3000/api/clientes/87367411234"
+                estados:
+                  - "id_credito": 1
+                    "monto_total": 19000000
+                    "total_pagos": 19000000
+                  - "id_credito": 3
+                    "monto_total": 9000000
+                    "total_pagos": 0
+        '400':
+          description: Se obtiene cuando no supera la validación del id_cliente
+        '403':
+          description: Se obtiene cuando un usuario que no es administrador intenta acceder a un id_cliente diferente al suyo            
+        '404':
+          description: El id_cliente no esta asociado con ninguna entidad       
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos   
+        
+      
+      
+  /reportes/historial/{id_cliente}:
+    get:
+      tags:
+        - Reportes
+      summary: Obtiene un reporte de todos los créditos y pagos relacionados con el cliente
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id_cliente
+          in: path
+          required: true
+          description: Identificador único del cliente
+          schema:
+            type: integer
+            example: 1     
+      responses:
+        '200':
+          description: Se retorna mensaje de confirmación al tener éxito la operación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_cliente:
+                    type: string
+                    example: Identificador único del cliente
+                  nombre:
+                    type: string
+                    example: nombre del cliente
+                  estados:
+                    type: array
+                    example: Contiene la información de todos los créditos incluyendo sus pagos asociados
+                    items:
+                      type: object
+              example:
+                "id_cliente": 3
+                "nombre": "Usuario de prueba"
+                "creditos":
+                  - "id_credito": 1
+                    "id_cliente": 3
+                    "monto_total": 19000000
+                    "cuotas": 100
+                    "fecha_inicio": "2025-02-27T21:41:22.854Z"
+                    "frecuencia_pago": "MENSUAL"
+                    "estado": "PAGADO"
+                    "pagos":
+                      - "id_pago": 25,
+                        "id_credito": 1,
+                        "monto_pago": 80000,
+                        "fecha_pago": "2025-03-05T00:40:42.255Z"
+                      - "id_pago": 20,
+                        "id_credito": 1,
+                        "monto_pago": 600000,
+                        "fecha_pago": "2025-03-04T23:50:59.999Z"
+                  - "id_credito": 2
+                    "id_cliente": 3
+                    "monto_total": 9000000
+                    "cuotas": 100
+                    "fecha_inicio": "2025-03-27T21:41:22.854Z"
+                    "frecuencia_pago": "MENSUAL"
+                    "estado": "PAGADO"
+                    "pagos":
+                      - "id_pago": 30,
+                        "id_credito": 1,
+                        "monto_pago": 80000,
+                        "fecha_pago": "2025-03-05T00:40:42.255Z"
+                      - "id_pago": 32,
+                        "id_credito": 1,
+                        "monto_pago": 600000,
+                        "fecha_pago": "2025-03-04T23:50:59.999Z"                           
+        '400':
+          description: Se obtiene cuando no supera la validación del id_cliente
+        '403':
+          description: Se obtiene cuando un usuario que no es administrador intenta acceder a un id_cliente diferente al suyo              
+        '404':
+          description: El id_cliente no esta asociado con ninguna entidad       
+        '503':
+          description: Se obtiene cuando ocurre un error inesperado en el sistema. Por ejemplo, cuando no se puede conectar a la base de datos               
+      

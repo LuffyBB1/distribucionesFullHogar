@@ -22,7 +22,7 @@ const JwtSchemeAuthorization  = async(req, res, next) => {
         loggerMiddleware.info(`UserId ${payload.sub} authentication successfully`);
         next();
     } catch(err){
-        loggerMiddleware.error(`User authentication failed: ${err.message}`);
+        loggerMiddleware.error(`User authentication failed: ${err}`);
         return res.status(401).json("Unauthorized"); 
     }
 

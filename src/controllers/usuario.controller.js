@@ -42,6 +42,7 @@ const crearUsuario = async (req, res)=> {
                     return usuarioCreado;
                 });
                 return res.status(201).json({
+                    message: "Usuario creado satisfactoriamente",
                     usuario_id: `${process.env.HOST}/api/usuarios/${usuarioCreado.id_user}`
                 });                   
             }catch(err){
@@ -107,7 +108,7 @@ const obtenerUsuarioPorId = async (req, res)=>{
     try{
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
-            return res.status(400).json();; 
+            return res.status(400).json();
         } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
         const usuario = await prisma.usuario.findUniqueOrThrow({
@@ -132,7 +133,7 @@ const obtenerUsuarioPorId = async (req, res)=>{
       }  
 
 }
-const obtenerUsuarios = async (res) =>{
+const obtenerUsuarios = async (req, res) =>{
     try {
         const usuarios = await prisma.usuario.findMany({
             select: {

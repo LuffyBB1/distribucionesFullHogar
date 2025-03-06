@@ -23,7 +23,7 @@ const registrarPago = async (req, res) => {
     }
 
     if (credito.estado === "PAGADO") {
-      return res.status(400).json({ error: "El crédito ya está pagado" });
+      return res.status(409).json({ error: "El crédito ya está pagado" });
     }
 
     const pagosRealizados = await prisma.pago.aggregate({
@@ -49,7 +49,7 @@ const registrarPago = async (req, res) => {
       }
       return pago;
     });
-    return res.status(201).json(nuevoPago);
+    return res.status(201).json(`Pago con id:${nuevoPago.id} fue creado exitosamente`);
   } catch (error) {
     loggerMiddleware.error(error.message);
     return res.status(503).json("No se pudo contactar con el servicio");   
@@ -88,11 +88,10 @@ const modificarPago = async (req, res) => {
     loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
     return res.status(400).json(); 
   } 
-  const { id } = req.params;
   const { id_credito, monto_pago } = req.body;
   try {
     const pagoExistente = await prisma.pago.findUniqueOrThrow({
-      where: { id_pago: parseInt(id) },
+      where: { id_pago: req.params.id },
     });
 
     const credito = await prisma.credito.findUniqueOrThrow({
@@ -106,30 +105,31 @@ const modificarPago = async (req, res) => {
 
     const totalPagado = pagosRealizados._sum.monto_pago || 0;  
 
-    const pagoActualizado = prisma.$transaction(async (tx) =>{
-      if ((credito.monto_total - totalPagado - (monto_pago - pagoExistente.monto_pago )) >= 1) {
-
-        await tx.credito.update({
-          where: { id_credito: credito.id_credito },
-          data: { estado: "PENDIENTE" },
-        });
-      } else {
-        await tx.credito.update({
-          where: { id_credito: credito.id_credito },
-          data: { estado: "PAGADO" },
-        });
+    try {
+        const pagoActualizado = await prisma.$transaction(async (tx) => {
+          if ((credito.monto_total - totalPagado - (monto_pago - pagoExistente.monto_pago )) >= 1) {
+    
+            await tx.credito.update({
+              where: { id_credito: credito.id_credito },
+              data: { estado: "PENDIENTE" },
+            });
+          } else {
+            await tx.credito.update({
+              where: { id_credito: credito.id_credito },
+              data: { estado: "PAGADO" },
+            });
+          }
+          return await prisma.pago.update({
+            where: { id_pago: req.params.id },
+            data: { monto_pago },
+          });
+        });    
+        return res.status(200).json(`Pago con id:${pagoActualizado.id_pago} fue modificado exitosamente`);
+    
+      } catch(err) {
+        loggerMiddleware.error(error.message);
+        return res.status(503).json("Servicio no disponible");
       }
-      return await prisma.pago.update({
-        where: { id_pago: parseInt(id) },
-        data: { monto_pago },
-      });
-    });
-
-    if (pagoActualizado == null) {
-      return res.status(503).json("Servicio no disponible");
-    }
-
-    return res.status(200).json(pagoActualizado);
 
   } catch (error) {
     if (validateNotFoundInPrisma(error)) {
@@ -162,7 +162,7 @@ const eliminarPago = async (req, res)=> {
       where: {id_pago: parseInt(req.params.id)}
     });
     if (pagoEliminado == null) { return res.status(503).json();}
-    return res.status(200).json(`El pago con id ${pagoEliminado.id_pago} ha sido eliminado satisfactoriamente`);
+    return res.status(200).json(`Pago con id ${pagoEliminado.id_pago} ha sido eliminado satisfactoriamente`);
   }catch(err){
     if (validateNotFoundInPrisma(err)) {
       return res.status(404).json();

@@ -1,8 +1,8 @@
 const { prisma } = require("../../prisma/database.client.prisma");
 const { validationResult } = require("express-validator");
 const { loggerMiddleware } = require("../logging/logger");
-
 const { validateNotFoundInPrisma, extraerDtoDeRequest } = require("../../utils/validatemodels");
+const { creditoInfo } = require("../../prisma/schema/dto/models.dto");
 
 const actualizarInformacionCredito = async (req, res) => {
     try {
@@ -10,16 +10,15 @@ const actualizarInformacionCredito = async (req, res) => {
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
         } 
-        const { id } = req.params;
         const credito = await prisma.credito.findFirstOrThrow({
-            where: {id_credito: id}
+            where: {id_credito: req.params.id}
         });
         if (credito.estado === "PAGADO") {
-            return res.status(400).json({ error: "No se puede modificar un crédito que ya ha sido pagado" });
+            return res.status(409).json({ error: "No se puede modificar un crédito que ya ha sido pagado" });
         }
         const data = extraerDtoDeRequest(req.body, ["monto_total", "frecuencia_pago", "cuotas"]);
         const creditoActualizado = await prisma.credito.update({
-            where: {id_credito : id},
+            where: {id_credito : req.params.id},
             data: data
         });
         if (creditoActualizado){
@@ -27,9 +26,8 @@ const actualizarInformacionCredito = async (req, res) => {
                  message: "Crédito actualizado exitosamente"
             });
         } else{
-            return res.status(503).json({
-                message: "Crédito no pudo ser actualizado"
-           });            
+            loggerMiddleware.error(error.message);
+            return res.status(503).json("No se pudo contactar con el servicio");            
         }
         
     } catch(error) {
@@ -47,16 +45,15 @@ const cambiarEstadoCredito = async (req, res) => {
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
         }         
-        const { id } = req.params;
         const credito = await prisma.credito.findFirstOrThrow({
-            where: {id_credito: parseInt(id)},
+            where: {id_credito: req.params.id},
             select: {
                 monto_total: true,
                 estado: true
             }
         });
         if (credito.estado === "PAGADO") {
-            return res.status(400).json({
+            return res.status(204).json({
                 message: "El crédito ya está pagado"
             });            
         }
@@ -65,7 +62,7 @@ const cambiarEstadoCredito = async (req, res) => {
             _sum: {
                 monto_pago: true
             },
-            where: {id_credito: parseInt(id)}
+            where: {id_credito: req.params.id}
         }))._sum.monto_pago;
 
         if (totalAbonos === null | credito.monto_total - totalAbonos > 0.01){
@@ -74,12 +71,12 @@ const cambiarEstadoCredito = async (req, res) => {
             });
         }
         const creditoActualizado = await prisma.credito.update({
-            where: {id_credito: parseInt(id)},
+            where: {id_credito: req.params.id},
             data: {estado: "PAGADO"}
         });
         if (creditoActualizado) {            
             return res.status(200).json({
-                message: "Crédito marcado como pagado"
+                message: `Crédito con id: ${req.params.id} fue marcado como pagado`
             });
         }
     } catch(error) {
@@ -98,14 +95,14 @@ const crearCredito = async (req, res) => {
             return res.status(400).json();; 
         } 
         if (!(await verificarClienteExiste(parseInt(req.body.id_cliente)))){
-            return res.status(400).json({error: "El cliente no existe"});
+            return res.status(404).json({error: "El cliente no existe"});
         }
-        const dataCredito = extraerDtoDeRequest(req.body, Object.keys(creditoDto));
+        const dataCredito = extraerDtoDeRequest(req.body, Object.keys(creditoInfo));
         const creditoCreado = await prisma.credito.create({data: dataCredito});
         if (creditoCreado) {
             return res.status(201).json({
                 message: "Crédito registrado exitosamente",
-                "id_credito": `${process.env.HOST}/api/credito/${creditoCreado.id_credito}`
+                "id_credito": `${process.env.HOST}/api/creditos/${creditoCreado.id_credito}`
             });
         }        
     } catch(error) {
@@ -123,9 +120,9 @@ const eliminarCredito = async (req, res) => {
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
         } 
-        const { id } = req.params;
+        
         const pagosAsociados = await prisma.pago.findMany({
-            where: {id_credito: parseInt(id)}
+            where: {id_credito: req.params.id}
         });
         if (pagosAsociados.length > 0){
             return res.status(409).json({
@@ -133,11 +130,11 @@ const eliminarCredito = async (req, res) => {
             });
         } 
         const creditoEliminado = await prisma.credito.delete({
-            where: {id_credito: parseInt(id)}
+            where: {id_credito: req.params.id}
         });
         if (creditoEliminado){
             return res.status(200).json({
-                message: "Crédito eliminado exitosamente"
+                message: `Crédito cond id: ${req.params.id} fue eliminado exitosamente`
             });
         }
     } catch(error) {
@@ -153,29 +150,21 @@ const obtenerCreditoPorCliente = async (req, res) => {
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
-        }              
-        const clienteId = req.query.id_cliente;        
-        const clienteExiste = await verificarClienteExiste(clienteId);
-        if (!clienteExiste || clienteExiste === null) {
-            return res.status(400).json({error: "Cliente no encontrado"});
-        }
-        
-        const creditosCliente = (await prisma.cliente.findFirst({
-            where: {id_cliente: parseInt(clienteId)},
+        }                         
+        const creditosCliente = (await prisma.cliente.findUniqueOrThrow({
+            where: {id_cliente: req.query.id_cliente},
             relationLoadStrategy: 'join',
             select :{
                 creditos: true
             }
         })).creditos;
-        
-
         if (creditosCliente) {
             return res.status(200).json(creditosCliente);
         }
 
     } catch(error) {
         if (validateNotFoundInPrisma(error)) {
-            return res.status(404).json();
+            return res.status(404).json("El id enviado no esta relacionado con ningun cliente");
         }       
         loggerMiddleware.error(error.message);
         return res.status(503).json("No se pudo contactar con el servicio");       
@@ -185,16 +174,11 @@ const obtenerCreditoPorCliente = async (req, res) => {
 
 const verificarClienteExiste = async (cliente_id) => {
     try {
-    
-        cliente = await prisma.cliente.findFirst({
+        cliente = await prisma.cliente.findFirstOrThrow({
             where: {id_cliente: parseInt(cliente_id)}
         });
-        if (cliente) {
-            return true;
-        }
-        
+        return true;
     } catch (error){
-        console.error(error);
         if (validateNotFoundInPrisma(error)) {
             return false;
         }

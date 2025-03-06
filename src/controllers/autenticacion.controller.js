@@ -57,8 +57,15 @@ const logout = async (req, res) => {
             }
         });
         if (tokenBetado) {
-            return res.status(202).json();
+            res.status(202).json();
         }
+        const fecha = new Date();
+        prisma.token.deleteMany({
+            where: {fecha_ban : {
+                lte: (new Date(fecha.getFullYear(), fecha.getMonth() - 1, fecha.getDate() - 1, 23, 59, 59))
+                    .toLocaleString('en-US', { timeZone: "America/Bogota" })
+            }}
+        })
     } catch(err){
         loggerMiddleware.info.error(err.message);
         return res.status(503).json();

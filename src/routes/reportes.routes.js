@@ -12,7 +12,7 @@ router.use(JwtSchemeAuthorization);
 const adminPolicy = policyMiddlewareFactory("Admin");
 const userPolicy = policyMiddlewareFactory("User");
 
-router.get("/reportes/estado_cuentas",adminPolicy ,crearReportesDto, Reportes.estadoFinancieroClientes);
+router.get("/reportes/estado_cuentas",adminPolicy , Reportes.estadoFinancieroClientes);
 router.get("/reportes/resumen", adminPolicy, crearReportesDto, Reportes.resumenFinancieroPeriodico);
 router.get("/reportes/resumen/clientes/:id",userPolicy, validarParamsIntId, Reportes.resumenCliente);
 router.get("/reportes/historial/:id",userPolicy, validarParamsIntId ,Reportes.historialCliente);

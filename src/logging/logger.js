@@ -53,13 +53,9 @@ const loggerHttpErrors = expressWinston.errorLogger({
       json: true,
       colorize: true
     }),
-    new DailyRotateFile({
-      filename: './src/logging/logs/http-error-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '30d'
-    })      
+    new transports.File({ 
+      filename: './src/logging/logs/http-errors.log', level: 'error' 
+    }),   
   ]
 });
 
