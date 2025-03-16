@@ -3,7 +3,10 @@ const expressWinston = require('express-winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const { createLogger, format, transports } = require('winston');
 
-
+/**
+ * Configura el logger que se usará durante la ejecución de los middlewares
+ * @returns {winston.Logger} Retorna un objeto para logeo basado en wiston.
+ */
 const loggerMiddleware = createLogger({
   level: 'http',
   format: format.combine(
@@ -25,7 +28,11 @@ const loggerMiddleware = createLogger({
   ]
 });
 
-
+/**
+ * Configura el logger que registrará todas las peticiones HTTP entrantes
+ * @returns {winston.Logger} Retorna un objeto para logeo basado en wiston.
+ */
+con
 const loggerHttpEvents = expressWinston.logger({
   transports: [
     new winston.transports.Console({
@@ -47,6 +54,10 @@ const loggerHttpEvents = expressWinston.logger({
   ignoreRoute: function (req, res) { return false; } // optional: allows to skip some log messages based on request and/or response
 });
 
+/**
+ * Configura el logger que registrará los errores provenientes de peticiones HTTP entrantes mal configuradas
+ * @returns {winston.Logger} Retorna un objeto para logeo basado en wiston.
+ */
 const loggerHttpErrors = expressWinston.errorLogger({
   transports: [
     new winston.transports.Console({

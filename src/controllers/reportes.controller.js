@@ -5,9 +5,14 @@ const { loggerMiddleware } = require("../logging/logger");
 const { validationResult } = require("express-validator");
 
 
-
+/**
+ * Función que permite obtener un balance del monto pendiente por pagar de todos los usuarios registrados. Soporta paginación.
+ */   
 const estadoFinancieroClientes = async(req, res)=> {
     try {        
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */            
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json();; 
@@ -27,6 +32,9 @@ const estadoFinancieroClientes = async(req, res)=> {
             loggerMiddleware.error(error.message);
             return res.status(204).json(Array());   
         }        
+        /**
+         * Se realiza conversión a entero del monto adeudado para conservar el formato json de la respuesta.
+         */            
         reporte.forEach(cliente => {
             cliente.saldo_total = parseInt(cliente.saldo_total);
         });        
@@ -38,8 +46,14 @@ const estadoFinancieroClientes = async(req, res)=> {
     }
 }
 
+/**
+ * Función que permite obtener el listado de créditos y pagos asociados para un cliente en específico. Soporta paginación.
+ */   
 const historialCliente = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */          
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -51,6 +65,10 @@ const historialCliente = async (req, res) => {
         }          
         const offset = page === undefined ? 0 : (parseInt(page) - 1) * parseInt(limit);  
         let filter;
+        /**
+         * Se verifica que el usuario que esta accediendo al endpoint solo pueda revisar su estado de crédito. En el caso de que sea admin del sistema, podrá verificar
+         * cualquier estado de crédito.
+         */          
         if (req.isAdmin) {
             filter = {
                 id_cliente: id
@@ -93,15 +111,23 @@ const historialCliente = async (req, res) => {
         return res.status(503).json("No se pudo contactar con el servicio");   
     }   
 }
-
+/**
+ * Función que permite obtener un balance de cuanto del total del monto adeudado y del total pagado por un cliente
+ */  
 const resumenCliente = async(req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */          
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
         } 
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
-        const { id } = req.params;
+        /**
+         * Se verifica que el usuario que esta accediendo al endpoint solo pueda revisar su estado de crédito. En el caso de que sea admin del sistema, podrá verificar
+         * cualquier estado de crédito.
+         */  
         let filter;
         if (req.isAdmin) {
             filter = {
@@ -144,8 +170,15 @@ const resumenCliente = async(req, res) => {
     }    
 }
 
+/**
+ * Función que permite obtener un estado de financiero del monto total que se ha financiado a crédito y el monto total que ha sido pagado por todos los clientes.
+ * Este reporte se genera entre dos fechas que recibe mediante req.query
+ */   
 const resumenFinancieroPeriodico = async(req, res)=> {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */           
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json();; 

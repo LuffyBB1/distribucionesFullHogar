@@ -4,14 +4,26 @@ const {validateNotFoundInPrisma, validateUniqueFieldViolation, extraerDtoDeReque
 const { loggerMiddleware } = require("../logging/logger");
 const {eliminarCliente} = require("./clientes.controller");
 const { validationResult } = require("express-validator");
-
+/**
+ * Función que permite obtener crear un usuario de acuerdo con los roles definidos en el cuerpo en la petición
+ */  
 const crearUsuario = async (req, res)=> {
+    /**
+     * Se define un salt para el almancenamiento de contraseñas
+     */       
     const saltRounds = 12;
     try{
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */         
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);            
             return res.status(400).json();; 
         } 
+        /**
+         * Se busca si existe un cliente asociado al documento de identidad pasado en la solicitud. En caso de encontrarse, este será asociado al usuario.
+         * No se toman acciones si no existe cliente.
+         */           
         const cliente =  await prisma.cliente.findUnique({
             where: {documentoIdentidad: req.body.documentoIdentidad}
         });
@@ -20,13 +32,11 @@ const crearUsuario = async (req, res)=> {
             if (Array.isArray(req.body.roles)){
                 return req.body.roles.includes(role.Name);
             } else {
-
                 return role.Name === req.body.roles;
             }
         })).
         map(role => role.id);
         bcrypt.hash(req.body.password, saltRounds, async function(err, hash) {
-        // Store hash in your password DB.
             const data = {
                 email: req.body.email.toLowerCase(),
                 password: hash,
@@ -60,17 +70,27 @@ const crearUsuario = async (req, res)=> {
     }    
 }
 
-
+/**
+ * Función para actualizar la contraseña, correo electrónico o nombre del usuario.
+ */   
 const actualizarUsuario = async (req, res)=>{
     try {        
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */        
         if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
             loggerMiddleware.error('Validation errors:', JSON.stringify(validationResult(req).array()));
             return res.status(400).json(); 
         } 
+        /**
+         * Se verifica si el usuario que accede al endpoint tiene role Admin o User
+         */        
         if (req.userId !== req.params.id && !req.isAdmin) { return res.status(403).json(); }
-        let usuarioActualizado;
         let clienteActualizado;
         if (Object.keys(req.body).length > 0){
+        /**
+         * Se extrae únicamente los campos de la entidad usuario que se pueden editar
+         */                  
             const data = extraerDtoDeRequest(req.body, ["email", "password"]);
             usuarioActualizado = await prisma.usuario.update({
                 where: {id_user : req.params.id},
@@ -80,7 +100,9 @@ const actualizarUsuario = async (req, res)=>{
         const cliente = (await prisma.cliente.findUnique({
             where: {id_usuario : usuarioActualizado.id_user},
         }));
-        
+        /**
+         * Se verifica si la petición incluye la modificación del nombre del usuario. Esta modificación se lleva sobre la entidad cliente.
+         */          
         if (req.body.nombre && cliente == null) { return res.status(409).json("El usuario no tiene un cliente asociado") }            
         if (req.body.nombre && cliente != null){
             clienteActualizado = await prisma.cliente.update({
@@ -88,8 +110,10 @@ const actualizarUsuario = async (req, res)=>{
                     data: { nombre: req.body.nombre }
             });
         }
-        
-        if (usuarioActualizado == null || clienteActualizado == null) { 
+        /**
+         * Se verifica si realizó con existo la modificación de la entidad cliente o usuario
+         */          
+        if (usuarioActualizado != null || clienteActualizado != null) { 
             return res.status(200).json("Usuario actualizado");
         } else {
             return res.status(404).json();
@@ -104,8 +128,15 @@ const actualizarUsuario = async (req, res)=>{
         return res.status(503).json("No se pudo contactar con el servicio");   
       }  
 }
+
+/**
+ * Función para obtener un usuario por su Id e incluye el nombre del cliente asociado, en caso que este exista
+ */   
 const obtenerUsuarioPorId = async (req, res)=>{
     try{
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */        
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json();
@@ -133,6 +164,10 @@ const obtenerUsuarioPorId = async (req, res)=>{
       }  
 
 }
+
+/**
+ * Función para obtener todos los usuarios registrados.
+ */  
 const obtenerUsuarios = async (req, res) =>{
     try {
         const usuarios = await prisma.usuario.findMany({
@@ -157,9 +192,16 @@ const obtenerUsuarios = async (req, res) =>{
     }
 }
 
+
+/**
+ * Función para eliminar un usuario, y eventualmente su cliente asociado, en caso de que este último exista.
+ */  
 const eliminarUsuario = async (req, res) =>{
     try
     {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */          
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -171,14 +213,16 @@ const eliminarUsuario = async (req, res) =>{
                 client: true
             }
         });
-
+        /**
+         * Se modifica el request para que el id corresponda al número del documento de identidad y de esta forma poder reutilizar el endpoint de eliminación de cliente.
+         */   
         if (usuario.client != null) {
             req.id = usuario.client.id
             await eliminarCliente(req, res);
         }
         const usuarioEliminado = await prisma.usuario.delete({
             where: { id_user: usuario.id_user }        
-        });    
+    });    
         return res.status(200).json({message: `Usuario con id: ${usuarioEliminado.id_user} fue eliminado con éxito.`});
 
     }catch (error) {

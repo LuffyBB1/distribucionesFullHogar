@@ -1,5 +1,8 @@
 const {checkSchema} = require("express-validator");
 
+
+
+
 const validarParamsIntId  = checkSchema({
     id: {
       exists: true,

@@ -1,6 +1,14 @@
 const { prisma } = require("../../prisma/database.client.prisma")
 const { loggerMiddleware } = require("../logging/logger");
 
+
+/**
+ * Construye un objeto de claims que será utilizado para validar una política de autorización. 
+ * En esta versión solo se incluyen los claims de es autenticado y los roles que el usuario debe tener para ser autorizado.
+ * @param {string | Array} roleValue - nombre o lista de nombres de roles.
+ * @returns {Object} Retorna un objeto que contiene los claims para validar autorización.
+ */
+
 const roleRequirements = async (roleValue) => {
     const roles = Array();
     const rolesToFind = Array.isArray(roleValue) ? roleValue : [roleValue];
@@ -22,6 +30,15 @@ const roleRequirements = async (roleValue) => {
         roles : roles
     };
 }
+
+/**
+ * Compara que un objeto de claims tiene los atributos definidos para la política de autorización
+ * En esta versión solo se incluyen los claims de es autenticado y los roles que el usuario debe tener para ser autorizado.
+ * @param {Object} claimsObject - objeto con claims del usuario autenticado
+ * @param {Object} thrutyValuesObject - objeto con claims que deben verificarse. Se define en la política de autorización con la función roleRequirements
+ * @returns {Boolean} Retorna un objeto que contiene los claims para validar autorización.
+ */
+
 const claimsValidaton = (claimsObject, thrutyValuesObject) =>{
     try {
         const validation = Object.keys(thrutyValuesObject).map((claim) => {
@@ -54,10 +71,27 @@ const claimsValidaton = (claimsObject, thrutyValuesObject) =>{
     }
 }
 
+/**
+ * Compara que un objeto de claims tiene los atributos definidos para la política de autorización
+ * En esta versión solo se incluyen los claims de es autenticado y los roles que el usuario debe tener para ser autorizado.
+ * @param {Object} claimsObject - objeto con claims del usuario autenticado
+ * @param {string | Array} roleValue - contiene el nombre de los roles que el usuario debe tener para poder ser autorizado
+ * @returns {Boolean} Retorna un objeto que contiene los claims para validar autorización.
+ */
+
+
 const validateRoleRequirements = async (claimsObject, roleValue) => {
         const requirements = await roleRequirements(roleValue);
         return claimsValidaton(claimsObject, requirements);
 }
+
+
+/**
+ * Construye una función que representa la politica de autorización basada en roles.
+ * @param {string | Array} roleValue - contiene el nombre de los roles que el usuario debe tener para poder ser autorizado
+ * @returns {Function} función middleware que representa la politica de autorización creada para el rol ingresado.
+ */
+
 
 const rolePolicyMiddlewareFactory = (roleValue) => {
     

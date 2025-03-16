@@ -2,7 +2,10 @@ const { requiredTokenPayloadClaims, validateToken } = require("./auth.jwt.handle
 const { prisma } = require("../../prisma/database.client.prisma");
 const { loggerMiddleware } = require("../logging/logger");
 
-
+/**
+ * Middle de autenticación de usuarios basdo en JWT tokens. Realiza validación del token y busca si este se encuentra en la lista de tokens banneados
+ * @returns {req} req - modifica el request para incluir los claims de IsAuthenticated y jti.
+ */
 const JwtSchemeAuthorization  = async(req, res, next) => {
     try{
         const authHeader = req.headers['authorization'];
@@ -14,8 +17,8 @@ const JwtSchemeAuthorization  = async(req, res, next) => {
             where: {jti : payload.jti}
         });
         var tokenClaims = Object.keys(payload);
-        const hasRequiredTokens = (requiredTokenPayloadClaims.map(claim => tokenClaims.includes(claim))).every(Boolean);
-        if (foundBannedToken || !hasRequiredTokens) { return res.status(401).json("Unauthorized"); }
+        const hasRequiredClaims = (requiredTokenPayloadClaims.map(claim => tokenClaims.includes(claim))).every(Boolean);
+        if (foundBannedToken || !hasRequiredClaims) { return res.status(401).json("Unauthorized"); }
         req.userId = payload.sub;
         req.isAuthenticated = true
         req.authToken = payload.jti

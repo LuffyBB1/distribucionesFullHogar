@@ -11,6 +11,12 @@ const tokenValidationParams = {
 
 const requiredTokenPayloadClaims = ["sub", "jti", "iss", "aud", "exp"];
 
+/**
+ * Genera el payload del JWT Token utilizado por el sistema de autenticación
+ * @param {string} sub - representa el id del usuario
+ * @returns {Object} Payload del token JWT.
+ */
+
 const generatePayload = (sub) => {
     return {
         sub: sub,
@@ -19,6 +25,12 @@ const generatePayload = (sub) => {
         aud: tokenValidationParams.validAudience
     }    
 };
+
+/**
+ * Genera y Firma el token JWT para el sistema de autenticación
+ * @param {Object} tokenPayload - representa el cuerpo del token JWT
+ * @returns {string} token JWT firmado.
+ */
 
 const signToken = (tokenPayload) => {
     return jwt.sign(
@@ -31,6 +43,11 @@ const signToken = (tokenPayload) => {
     )
 };
 
+/**
+ * Valida que el token haya sido firmado por el valid issuer definido en la configuración del sistema
+ * @param {string} token - token JWT
+ * @returns {Object} Payload del token JWT.
+ */
 
 const validateToken = (token) => {
     const options = Object();

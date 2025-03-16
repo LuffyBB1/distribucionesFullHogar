@@ -4,8 +4,16 @@ const { loggerMiddleware } = require("../logging/logger");
 const { validateNotFoundInPrisma, extraerDtoDeRequest } = require("../../utils/validatemodels");
 const { creditoInfo } = require("../../prisma/schema/dto/models.dto");
 
+
+
+/**
+ * Función que permite modificar el monto total, frecuencia de pago o número de cuotas de un crédito
+ */  
 const actualizarInformacionCredito = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */          
         if (!validationResult(req).isEmpty() || Object.keys(req.body).length == 0) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -17,6 +25,9 @@ const actualizarInformacionCredito = async (req, res) => {
             return res.status(409).json({ error: "No se puede modificar un crédito que ya ha sido pagado" });
         }
         const data = extraerDtoDeRequest(req.body, ["monto_total", "frecuencia_pago", "cuotas"]);
+        /**
+         * Extrae únicamente los campos permitidos para actualizar del cuerpo de la petición.
+         */                  
         const creditoActualizado = await prisma.credito.update({
             where: {id_credito : req.params.id},
             data: data
@@ -38,9 +49,14 @@ const actualizarInformacionCredito = async (req, res) => {
         return res.status(503).json("No se pudo contactar con el servicio");                   
     }
 }
-
+/**
+ * Función que permite modificar el monto total, frecuencia de pago o número de cuotas de un crédito
+ */ 
 const cambiarEstadoCredito = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */           
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -57,7 +73,10 @@ const cambiarEstadoCredito = async (req, res) => {
                 message: "El crédito ya está pagado"
             });            
         }
-
+        /**
+         * Se verifica si el monto abonado a la fecha es igual a la cantidad adeudada. En caso de que no, no se prosigue para modificar el estado del crédito.
+         * Se usa precisión de 1 peso para validar las equivalencias.
+         */      
         const totalAbonos = (await prisma.pago.aggregate({
             _sum: {
                 monto_pago: true
@@ -65,7 +84,7 @@ const cambiarEstadoCredito = async (req, res) => {
             where: {id_credito: req.params.id}
         }))._sum.monto_pago;
 
-        if (totalAbonos === null | credito.monto_total - totalAbonos > 0.01){
+        if (totalAbonos === null | credito.monto_total - totalAbonos > 1){
             return res.status(409).json({
                 message: "El crédito no puede ser marcado como pagado porque el total de los abonos registrados son inferiores al monto adeudado"
             });
@@ -87,9 +106,14 @@ const cambiarEstadoCredito = async (req, res) => {
         return res.status(503).json("No se pudo contactar con el servicio");             
     }
 }
-
+/**
+ * Función que permite crear un crédito para un usuario en específico.
+ */
 const crearCredito = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */             
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json();; 
@@ -97,6 +121,9 @@ const crearCredito = async (req, res) => {
         if (!(await verificarClienteExiste(parseInt(req.body.id_cliente)))){
             return res.status(404).json({error: "El cliente no existe"});
         }
+        /**
+         * Extrae únicamente del cuerpo de la petición unicamente los campos requeridos para la creación del crédito.
+         */          
         const dataCredito = extraerDtoDeRequest(req.body, Object.keys(creditoInfo));
         const creditoCreado = await prisma.credito.create({data: dataCredito});
         if (creditoCreado) {
@@ -113,9 +140,14 @@ const crearCredito = async (req, res) => {
         return res.status(503).json("No se pudo contactar con el servicio");   
     }
 }
-
+/**
+ * Función que permite eliminar un crédito únicamente cuando no existen pagos asociados.
+ */
 const eliminarCredito = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */           
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -145,8 +177,15 @@ const eliminarCredito = async (req, res) => {
         return res.status(503).json("No se pudo contactar con el servicio");      
     }
 }
+
+/**
+ * Función que permite obtyener la información de los créditos de un cliente a partir de su documento de identidad.
+ */
 const obtenerCreditoPorCliente = async (req, res) => {
     try {
+        /**
+         * Se verifica que el resultado del middleware de validación de parámetros de la petición (i.e request.params, body o request.query) no contenga errores
+         */           
         if (!validationResult(req).isEmpty()) { 
             loggerMiddleware.info(`Validation errors: ${JSON.stringify(validationResult(req).array())}`);
             return res.status(400).json(); 
@@ -171,7 +210,9 @@ const obtenerCreditoPorCliente = async (req, res) => {
     }
 }
 
-
+/**
+ * Función que permite encontrar un cliente por su id
+ */
 const verificarClienteExiste = async (cliente_id) => {
     try {
         cliente = await prisma.cliente.findFirstOrThrow({
